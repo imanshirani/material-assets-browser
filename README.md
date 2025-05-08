@@ -2,7 +2,7 @@
 
 A powerful and flexible material library manager for **3ds Max**, supporting multiple render engines including **Octane**, **V-Ray**, **Arnold**, and **Corona**.
 
-![screenshot](etc/screenshots/overview.png)
+![screenshot](etc/screenshots/overview.jpg)
 
 ---
 
