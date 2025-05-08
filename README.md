@@ -1,4 +1,7 @@
-# Material Assets Browser
+# Material Assets Browser (Open Beta) 🚀
+Material Assets Browser for Autodesk 3ds Max 2025+
+
+Developed by: Iman Shirani
 
 A powerful and flexible material library manager for **3ds Max**, supporting multiple render engines including **Octane**, **V-Ray**, **Arnold**, and **Corona**.
 
