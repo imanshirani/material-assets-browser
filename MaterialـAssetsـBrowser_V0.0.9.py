@@ -1,6 +1,6 @@
 # ==========================
 # IMAN SHIRANI
-# 2025 V0.0.8 UI\UX
+# 2025 V0.0.9 Redshift 
 # ==========================
 
 # -*- coding: utf-8 -*-
@@ -127,7 +127,7 @@ class SettingsDialog(QDialog):
         self.setMinimumWidth(400)
         self.config = config
 
-        # ??????? ?? QTabWidget ???? ??? ??
+        # ======== QTabWidget ========
         main_layout = QVBoxLayout(self)
         self.tabs = QTabWidget()
         main_layout.addWidget(self.tabs)
@@ -149,8 +149,8 @@ class SettingsDialog(QDialog):
         widget = QWidget()
         layout = QFormLayout(widget)
 
-        layout.addRow("App Name:", QLabel("Octane Asset Browser"))
-        layout.addRow("Version:", QLabel("v0.0.8"))
+        layout.addRow("App Name:", QLabel("Material Asset Browser"))
+        layout.addRow("Version:", QLabel("v0.0.9"))
         layout.addRow("Developer:", QLabel("IMAN SHIRANI"))
         layout.addRow("Config Path:", QLabel(self.config.get("config_path", "Not Set")))
         link = QLabel('<a href="https://github.com/yourrepo">GitHub Repo</a>')
@@ -367,6 +367,12 @@ class AssetBrowserWidget(QWidget):
                 "Material_switch","Metallic_layer","Metallic_material","Mix_material","Portal_material",
                 "Shadow_catcher_material","Sheen_layer","Specular_layer","Specular_material","Std_Surface_Mtl",
                 "Toon_material","Universal_material" 
+            ],            
+            "redshift": [
+                "RS_Car_Paint", "RS_Contour", "RS_Hair", "RS_Incandescent", "RS_Material",
+                "RS_Material_Blender", "RS_Material_Output", "RS_Material_Switch", "RS_OpenPBR_Material",
+                "RS_OSL_Material", "RS_Principled_Hair", "RS_Random_Material_Switch", "RS_Ray_Switch_Material",
+                "RS_Skin", "RS_Sprite", "RS_SSS", "RS_Standard_Material", "RS_Standard_Volume", "RS_Store_Color_To_AOV", "RS_Surface"
             ],
             "arnold": [
                 "ai_standard_surface", "ai_car_paint", "ai_standard_hair",
@@ -404,9 +410,11 @@ class AssetBrowserWidget(QWidget):
             engine = str(rt.renderers.current).lower()
             print(f"[DEBUG] Active Render Engine: {engine}")
 
-            # ?????? ?? Octane
+            # detect engine
             if "octane" in engine:
                 return "octane"
+            elif "redshift" in engine:
+                return "redshift"
             elif "arnold" in engine:
                 return "arnold"
             elif "vray" in engine:
@@ -707,7 +715,7 @@ class AssetBrowserWidget(QWidget):
     
 # ==========================
 # generate thumbnail
-# ==========================     
+# ==========================
     def generate_thumbnail(self, mat_path, mat_name, callback=None):
         print(f"[GENERATE] Starting thumbnail for: {mat_name}")
         try:
@@ -718,7 +726,6 @@ class AssetBrowserWidget(QWidget):
             scene_dir = os.path.join(current_dir, "etc", "3dfile")
 
             # Load material
-            # ==========================  
             self.log_status(f"[DEBUG] Loading material from: {mat_path} / name: {mat_name}")
             lib = rt.loadTempMaterialLibrary(mat_path)
             mat = None
@@ -731,35 +738,40 @@ class AssetBrowserWidget(QWidget):
                 self.log_status(f"[ERROR] Material '{mat_name}' not found in {mat_path}")
                 return
 
-            # Determine if Octane
-            # ==========================  
+            # Determine render engine type
             class_name = str(rt.classOf(mat)).lower()
-            mat_path_clean = mat_path.replace("\\", "/")
             octane_classes = [cls.lower() for cls in self.allowed_classes.get("octane", [])]
-            is_octane = any(cls in class_name for cls in octane_classes)        
+            redshift_classes = [cls.lower() for cls in self.allowed_classes.get("redshift", [])]
+            is_octane = any(cls in class_name for cls in octane_classes)
+            is_redshift = any(cls in class_name for cls in redshift_classes)
 
             # Thumbnail path
-            # ==========================
             mat_clean = re.sub(r'[^\w\-_\.]', '_', mat_name)
             thumb_name = f"{mat_name}.jpg"
             thumb_path = os.path.join(os.path.dirname(mat_path), thumb_name).replace("\\", "/")
-            self.log_status(f"[DEBUG] Thumbnail output path: {thumb_path}")
             self.log_status(f"[DEBUG] Thumbnail output path: {thumb_path}")
 
             if not running_inside_3dsmax():
                 self.log_status("[ERROR] This must run inside 3ds Max.")
                 return
 
-            # === Octane: Use Render Scene ===
+            # === Octane or Redshift: Use Render Scene ===
             if is_octane:
                 scene_file = os.path.join(scene_dir, "Octane.max").replace("\\", "/")
-                self.log_status(f"[DEBUG] Scene file selected: {scene_file}")
+                engine_label = "Octane"
+            elif is_redshift:
+                scene_file = os.path.join(scene_dir, "RedShift.max").replace("\\", "/")
+                engine_label = "Redshift"
+            else:
+                scene_file = None
 
+            if scene_file:
+                self.log_status(f"[DEBUG] Scene file selected: {scene_file}")
                 if not os.path.isfile(scene_file):
                     self.log_status(f"[ERROR] Scene file does not exist: {scene_file}")
                     return
 
-                self.log_status("[INFO] Rendering inside 3ds Max (Octane)...")
+                self.log_status(f"[INFO] Rendering inside 3ds Max ({engine_label})...")
                 rt.loadMaxFile(scene_file, quiet=True)
 
                 sphere = rt.getNodeByName("Sphere001")
@@ -780,34 +792,27 @@ class AssetBrowserWidget(QWidget):
                     self.log_status("[DEBUG] Calling resetMaxFile...")
                     rt.resetMaxFile(rt.name("noPrompt"))
                     self.log_status("[DEBUG] resetMaxFile done.")
-                    self.log_status("[DEBUG] Scene reset after render.")
                 else:
                     self.log_status("[ERROR] Scene objects not found: Sphere001 or Cylinder001")
                     return
 
-            # === Non-Octane: Procedural scene render ===
             else:
+                # === Non-Octane/Redshift: Procedural scene render ===
                 try:
                     thumb_width, thumb_height = 128, 128
                     rt.renderWidth = thumb_width
                     rt.renderHeight = thumb_height
 
-                    # Create sphere
-                    # ==========================  
                     sphere = rt.sphere(radius=25, segments=32, pos=rt.Point3(0, 0, 0))
                     sphere.material = mat
                     uvwmod = rt.UVWMap()
                     uvwmod.mapping = rt.Name("spherical")
                     rt.addModifier(sphere, uvwmod)
 
-                    # Background
-                    # ==========================  
                     bg = rt.plane(length=300, width=300)
                     bg.rotation = rt.eulerangles(-50, 0, 0)
                     bg.position = rt.Point3(0, 35, 0)
 
-                    # Background material
-                    # ==========================  
                     uv_texture_path = os.path.join(scene_dir, "UVChecke2.png").replace("\\", "/")
                     if os.path.exists(uv_texture_path):
                         tex = rt.Bitmaptexture()
@@ -825,8 +830,6 @@ class AssetBrowserWidget(QWidget):
                         uvw_bg.mapping = rt.Name("planar")
                         rt.addModifier(bg, uvw_bg)
 
-                    # Lighting
-                    # ==========================  
                     if self.active_render_engine == "arnold":
                         light = rt.Arnold_Light()
                         light.type = 3
@@ -840,16 +843,12 @@ class AssetBrowserWidget(QWidget):
                         light = rt.omniLight()
                         light.position = rt.Point3(50, -80, 100)
 
-                    # Camera
-                    # ==========================  
                     cam = rt.freeCamera()
                     cam.position = rt.Point3(0, -70, 40)
                     cam.target = sphere
                     rt.viewport.setCamera(cam)
                     cam.depthOfField = False
 
-                    # Render
-                    # ==========================  
                     rt.render(camera=cam, width=thumb_width, height=thumb_height, vfb=False, outputfile=thumb_path)
 
                     if os.path.exists(thumb_path):
@@ -857,8 +856,6 @@ class AssetBrowserWidget(QWidget):
                     else:
                         self.log_status(f"[ERROR] Thumbnail NOT saved: {thumb_path}")
 
-                    # Cleanup
-                    # ==========================  
                     rt.delete(sphere)
                     rt.delete(bg)
                     rt.delete(light)
@@ -876,10 +873,11 @@ class AssetBrowserWidget(QWidget):
                     self.thumbnail_dialog.close()
                 except Exception as e:
                     self.log_status(f"[WARNING] Could not close thumbnail dialog: {e}")
-                self.thumbnail_dialog = None  # ??? ?????
+                self.thumbnail_dialog = None
 
             self.show_status_message("Ready", "orange")
             self.process_next_thumbnail()
+
 
 # ==========================  
 # split material library 
@@ -951,7 +949,7 @@ class AssetBrowserWidget(QWidget):
         print(f"[QUEUE] Enqueuing thumbnail: {mat_name}")
         self.thumbnail_queue.append((mat_path, mat_name))
 
-        # ??? ??? thumbnail_dialog ???? ?????? ????? ??
+        #  thumbnail_dialog 
         if not getattr(self, 'thumbnail_dialog', None):
             self.thumbnail_dialog = ThumbnailProgressDialog(self)
             self.thumbnail_dialog.show()
@@ -1116,7 +1114,7 @@ class AssetBrowserWidget(QWidget):
                     icon = QIcon(QPixmap(thumb_file))
                 else:
                     default_pixmap = QPixmap(128, 128)
-                    default_pixmap.fill(Qt.black)  # ?? ??? ???????
+                    default_pixmap.fill(Qt.black)  # Box color
                     icon = QIcon(default_pixmap)
 
                 # PBR folder detection
@@ -1507,7 +1505,7 @@ class AssetBrowserWidget(QWidget):
                     tex_block(map_metal,    "metallic_tex"),
                     tex_block(map_norm,     "normal_tex"),
                     tex_block(map_opacity,  "opacity_tex"),
-                    tex_block(map_displace, "displacement_tex"),  # ??? ???? ???????????
+                    tex_block(map_displace, "displacement_tex"),  # Add Displacement
                     # tex_block(map_ao,       "ambient_occlusion_tex"),
                     tex_block(map_emission, "emission_tex"),
                     tex_block(map_gloss,    "specularLevel_tex")
@@ -1642,7 +1640,7 @@ class AssetBrowserWidget(QWidget):
 
                 from pymxs import runtime as rt
 
-                # MaxScript ???? rename ???? ??????
+                # MaxScript material rename
                 ms_code = f'''
                 try (
                     local lib = loadTempMaterialLibrary @"{mat_path}"
@@ -1777,7 +1775,7 @@ class AssetBrowserWidget(QWidget):
                         mat_path = os.path.join(root, file).replace("\\", "/")
                         thumbnail_path = os.path.join(root, f"{mat_name}.jpg").replace("\\", "/")
 
-                        # ??????? ?? ???? ??????:
+                        # Filter items
                         if any(self.asset_list.item(i).text() == mat_name for i in range(self.asset_list.count())):
                             continue
 
@@ -1811,7 +1809,7 @@ class AssetBrowserWidget(QWidget):
                 print(f"[WARN] No materials in: {mat_path}")
                 return None
 
-            mat = matlib[1]  # ?? max ?? 1 ???? ?????
+            mat = matlib[1]  # 
             mat_class = rt.classOf(mat).name
             print(f"[DEBUG] Mat class from {mat_path}: {mat_class}")
             return mat_class
@@ -1852,7 +1850,7 @@ def show_in_max():
             widget.close()
 
     dock = AssetBrowserDock(parent=main_window)
-    app.installEventFilter(dock.shelf_tool)  # ? ???? ???????
+    app.installEventFilter(dock.shelf_tool)  # DockableShelf
     main_window.addDockWidget(Qt.RightDockWidgetArea, dock)
     dock.show()
 
