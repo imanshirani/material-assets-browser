@@ -1,6 +1,6 @@
 # ==========================
 # IMAN SHIRANI
-# 2025 V0.0.9 Redshift 
+# 2025 V0.0.10 Fstorm 
 # ==========================
 
 # -*- coding: utf-8 -*-
@@ -150,7 +150,7 @@ class SettingsDialog(QDialog):
         layout = QFormLayout(widget)
 
         layout.addRow("App Name:", QLabel("Material Asset Browser"))
-        layout.addRow("Version:", QLabel("v0.0.9"))
+        layout.addRow("Version:", QLabel("v0.0.10"))
         layout.addRow("Developer:", QLabel("IMAN SHIRANI"))
         layout.addRow("Config Path:", QLabel(self.config.get("config_path", "Not Set")))
         link = QLabel('<a href="https://github.com/yourrepo">GitHub Repo</a>')
@@ -223,7 +223,7 @@ class AssetBrowserWidget(QWidget):
         self.btn_up = QPushButton()
         up_icon = QIcon(os.path.join(self.icon_path, "up.ico"))
         if up_icon.isNull():
-            print("[DEBUG] up.png icon is NULL   fallback to text")
+            print("[DEBUG] up.png icon is NULL — fallback to text")
             self.btn_up.setText("Back To Folder")
         else:
             self.btn_up.setIcon(up_icon)
@@ -236,7 +236,7 @@ class AssetBrowserWidget(QWidget):
         self.btn_new_folder = QPushButton()
         folder_icon = QIcon(os.path.join(self.icon_path, "folder.ico"))
         if folder_icon.isNull():
-            print("[DEBUG] folder.png icon is NULL   fallback to text")
+            print("[DEBUG] folder.png icon is NULL — fallback to text")
             self.btn_new_folder.setText("New Folder")
         else:
             self.btn_new_folder.setIcon(folder_icon)
@@ -249,7 +249,7 @@ class AssetBrowserWidget(QWidget):
         self.btn_refresh = QPushButton()
         refresh_icon = QIcon(os.path.join(self.icon_path, "refresh.ico"))
         if refresh_icon.isNull():
-            print("[DEBUG] refresh.png icon is NULL   fallback to text")
+            print("[DEBUG] refresh.png icon is NULL — fallback to text")
             self.btn_refresh.setText("Refresh")
         else:
             self.btn_refresh.setIcon(refresh_icon)
@@ -262,7 +262,7 @@ class AssetBrowserWidget(QWidget):
         self.btn_settings = QPushButton()
         settings_icon = QIcon(os.path.join(self.icon_path, "settins.ico"))
         if settings_icon.isNull():
-            print("[DEBUG] settings.png icon is NULL   fallback to text")
+            print("[DEBUG] settings.png icon is NULL — fallback to text")
             self.btn_settings.setText("Setting")
         else:
             self.btn_settings.setIcon(settings_icon)
@@ -275,7 +275,7 @@ class AssetBrowserWidget(QWidget):
         self.btn_assign = QPushButton()
         assign_icon = QIcon(os.path.join(self.icon_path, "assign.ico"))
         if assign_icon.isNull():
-            print("[DEBUG] assign.ico icon is NULL   fallback to text")
+            print("[DEBUG] assign.ico icon is NULL — fallback to text")
             self.btn_assign.setText("Assign To Object")  # If no icon, use text
         else:
             self.btn_assign.setIcon(assign_icon)
@@ -380,6 +380,10 @@ class AssetBrowserWidget(QWidget):
                 "ai_wireframe", "ai_flat", "ai_layer_shader", "ai_mix_shader",
                 "standard_surface", "aistandard", "aistandardsurface"
             ],
+            "fstorm": [
+                "FStormLightMat", "FStorm", "FStormMixMat","FStormOverrideMat", "FStormPortal",
+                "FStormProjectMat", "FStormSwitchMat", "FStormVolumeMat" 
+            ],
             "vray": [
                 "vraymtl", "vraylightmtl"
             ],
@@ -415,6 +419,8 @@ class AssetBrowserWidget(QWidget):
                 return "octane"
             elif "redshift" in engine:
                 return "redshift"
+            elif "fstorm" in engine:
+                return "fstorm"
             elif "arnold" in engine:
                 return "arnold"
             elif "vray" in engine:
@@ -423,10 +429,13 @@ class AssetBrowserWidget(QWidget):
                 return "corona"
             else:
                 return "other"
+                
 
         except Exception as e:
             print(f"[ERROR] Failed to detect render engine: {e}")
             return "other"
+        
+        
 
 
 # ==========================
@@ -435,7 +444,7 @@ class AssetBrowserWidget(QWidget):
     def is_material_class_allowed(self, mat, engine=None):
         try:
             from pymxs import runtime as rt
-            engine = engine or self.active_render_engine
+            engine = engine or self.active_render_engine.lower()
             mat_class_obj = rt.classOf(mat)
             mat_class = str(mat_class_obj.name).lower() if hasattr(mat_class_obj, "name") else str(mat_class_obj).lower()
             allowed = [cls.lower() for cls in self.allowed_classes.get(engine, [])]
@@ -742,8 +751,10 @@ class AssetBrowserWidget(QWidget):
             class_name = str(rt.classOf(mat)).lower()
             octane_classes = [cls.lower() for cls in self.allowed_classes.get("octane", [])]
             redshift_classes = [cls.lower() for cls in self.allowed_classes.get("redshift", [])]
+            fstorm_classes = [cls.lower() for cls in self.allowed_classes.get("fstorm", [])]
             is_octane = any(cls in class_name for cls in octane_classes)
             is_redshift = any(cls in class_name for cls in redshift_classes)
+            is_fstorm = any(cls in class_name for cls in fstorm_classes)
 
             # Thumbnail path
             mat_clean = re.sub(r'[^\w\-_\.]', '_', mat_name)
@@ -755,13 +766,16 @@ class AssetBrowserWidget(QWidget):
                 self.log_status("[ERROR] This must run inside 3ds Max.")
                 return
 
-            # === Octane or Redshift: Use Render Scene ===
+            # === Octane, Redshift, or FStorm: Use Render Scene ===
             if is_octane:
                 scene_file = os.path.join(scene_dir, "Octane.max").replace("\\", "/")
                 engine_label = "Octane"
             elif is_redshift:
                 scene_file = os.path.join(scene_dir, "RedShift.max").replace("\\", "/")
                 engine_label = "Redshift"
+            elif is_fstorm:
+                scene_file = os.path.join(scene_dir, "FStorm.max").replace("\\", "/")
+                engine_label = "FStorm"
             else:
                 scene_file = None
 
@@ -797,7 +811,7 @@ class AssetBrowserWidget(QWidget):
                     return
 
             else:
-                # === Non-Octane/Redshift: Procedural scene render ===
+                # === Non-Octane/Redshift, or FStorm: Procedural scene render ===
                 try:
                     thumb_width, thumb_height = 128, 128
                     rt.renderWidth = thumb_width
@@ -1809,7 +1823,7 @@ class AssetBrowserWidget(QWidget):
                 print(f"[WARN] No materials in: {mat_path}")
                 return None
 
-            mat = matlib[1]  # 
+            mat = matlib[1]  # ?? max ?? 1 ???? ?????
             mat_class = rt.classOf(mat).name
             print(f"[DEBUG] Mat class from {mat_path}: {mat_class}")
             return mat_class
