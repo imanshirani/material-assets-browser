@@ -21,6 +21,7 @@ A powerful and flexible material library manager for **3ds Max**, supporting mul
 - ⚙️ Configurable material root folder
 - 💾 Persistent settings in JSON
 - 🌗 Future support for light/dark UI themes
+- ❤️ Donation support for future development
 
 ---
 
@@ -32,5 +33,11 @@ A powerful and flexible material library manager for **3ds Max**, supporting mul
 
 ---
 
-## 📁 Folder Structure
+## ☕ Support Development
+
+If you enjoy this tool and want to support future updates:
+
+[![Donate ❤️](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate/?hosted_button_id=LAMNRY6DDWDC4)
+
+Thanks for your support! 🙏✨
 
