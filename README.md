@@ -1,6 +1,6 @@
 # Material Assets Browser (Open Beta) 🚀
 Material Assets Browser for Autodesk 3ds Max 2025+
-https://www.paypal.com/donate/?hosted_button_id=LAMNRY6DDWDC4
+[![Donate ❤️](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate/?hosted_button_id=LAMNRY6DDWDC4)
 
 Developed by: Iman Shirani
 
