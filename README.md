@@ -3,7 +3,7 @@ Material Assets Browser for Autodesk 3ds Max 2025+
 
 Developed by: Iman Shirani
 
-A powerful and flexible material library manager for **3ds Max**, supporting multiple render engines including **Octane**, **RedShift**, **V-Ray**, **Arnold**, and **Corona**.
+A powerful and flexible material library manager for **3ds Max**, supporting multiple render engines including **Octane**, **RedShift**, **Fstorm**, **V-Ray**, **Arnold**, and **Corona**.
 
 ![screenshot](etc/screenshots/overview.jpg)
 
