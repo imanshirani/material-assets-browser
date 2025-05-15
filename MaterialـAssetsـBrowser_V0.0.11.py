@@ -1,6 +1,6 @@
 # ==========================
 # IMAN SHIRANI
-# 2025 V0.0.10 Fstorm 
+# 2025 V0.0.11 Corona & Vray
 # ==========================
 
 # -*- coding: utf-8 -*-
@@ -150,7 +150,7 @@ class SettingsDialog(QDialog):
         layout = QFormLayout(widget)
 
         layout.addRow("App Name:", QLabel("Material Asset Browser"))
-        layout.addRow("Version:", QLabel("v0.0.10"))
+        layout.addRow("Version:", QLabel("v0.0.11"))
         layout.addRow("Developer:", QLabel("IMAN SHIRANI"))
         layout.addRow("Config Path:", QLabel(self.config.get("config_path", "Not Set")))
         link = QLabel('<a href="https://github.com/yourrepo">GitHub Repo</a>')
@@ -385,10 +385,16 @@ class AssetBrowserWidget(QWidget):
                 "FStormProjectMat", "FStormSwitchMat", "FStormVolumeMat" 
             ],
             "vray": [
-                "vraymtl", "vraylightmtl"
+                "VRay2SidedMtl", "VRayALSurfaceMtl", "VRayBlendMtl", 
+                "VRayBumpMtl", "VRayCarPaintMtl", "VRayCarPaintMtl2", "VRayFastSSS2", 
+                "VRayFlakesMtl", "VRayFlakesMtl2", "VRayHairNextMtl", "VRayLightMtl", 
+                "VRayMDLMtl", "VRayMtl", "VRayMtlWrapper", "VRayOSLMtl", "VRayPluginNodeMtl", 
+                "VRayPointParticleMtl", "VRayScannedMtl", "VRayScatterVolume", "VRayStochasticFlakesMtl"
             ],
             "corona": [
-                "coronamtl", "coronalightmtl", "coronaphysicalmtl"
+                "CoronaPhysicalMtl", "CoronaHairMtl", "CoronaLayeredMtl",
+                "CoronaLegacyMtl", "CoronaLightMtl", "CoronaRaySwitchMtl", "CoronaScannedMtl",
+                "CoronaSelectMtl", "CoronaShadowCatcherMtl","CoronaSkinMtl"
             ],
             "other": [
                 "physicalmaterial", "standard", "raytrace", "architectural",
@@ -423,7 +429,7 @@ class AssetBrowserWidget(QWidget):
                 return "fstorm"
             elif "arnold" in engine:
                 return "arnold"
-            elif "vray" in engine:
+            elif "v_ray" in engine:
                 return "vray"
             elif "corona" in engine:
                 return "corona"
@@ -752,9 +758,13 @@ class AssetBrowserWidget(QWidget):
             octane_classes = [cls.lower() for cls in self.allowed_classes.get("octane", [])]
             redshift_classes = [cls.lower() for cls in self.allowed_classes.get("redshift", [])]
             fstorm_classes = [cls.lower() for cls in self.allowed_classes.get("fstorm", [])]
+            corona_classes = [cls.lower() for cls in self.allowed_classes.get("corona", [])]
+            vray_classes = [cls.lower() for cls in self.allowed_classes.get("vray", [])]
             is_octane = any(cls in class_name for cls in octane_classes)
             is_redshift = any(cls in class_name for cls in redshift_classes)
             is_fstorm = any(cls in class_name for cls in fstorm_classes)
+            is_corona = any(cls in class_name for cls in corona_classes)
+            is_vray = any(cls in class_name for cls in vray_classes)
 
             # Thumbnail path
             mat_clean = re.sub(r'[^\w\-_\.]', '_', mat_name)
@@ -766,7 +776,7 @@ class AssetBrowserWidget(QWidget):
                 self.log_status("[ERROR] This must run inside 3ds Max.")
                 return
 
-            # === Octane, Redshift, or FStorm: Use Render Scene ===
+            # === Octane, Redshift, Corona, vray or FStorm: Use Render Scene ===
             if is_octane:
                 scene_file = os.path.join(scene_dir, "Octane.max").replace("\\", "/")
                 engine_label = "Octane"
@@ -776,6 +786,12 @@ class AssetBrowserWidget(QWidget):
             elif is_fstorm:
                 scene_file = os.path.join(scene_dir, "FStorm.max").replace("\\", "/")
                 engine_label = "FStorm"
+            elif is_corona:
+                scene_file = os.path.join(scene_dir, "Corona.max").replace("\\", "/")
+                engine_label = "Corona"
+            elif is_vray:
+                scene_file = os.path.join(scene_dir, "Vray.max").replace("\\", "/")
+                engine_label = "vray"
             else:
                 scene_file = None
 
@@ -811,7 +827,7 @@ class AssetBrowserWidget(QWidget):
                     return
 
             else:
-                # === Non-Octane/Redshift, or FStorm: Procedural scene render ===
+                # === Non-Octane/Redshift, Corona, vray or FStorm: Procedural scene render ===
                 try:
                     thumb_width, thumb_height = 128, 128
                     rt.renderWidth = thumb_width
@@ -827,7 +843,7 @@ class AssetBrowserWidget(QWidget):
                     bg.rotation = rt.eulerangles(-50, 0, 0)
                     bg.position = rt.Point3(0, 35, 0)
 
-                    uv_texture_path = os.path.join(scene_dir, "UVChecke2.png").replace("\\", "/")
+                    uv_texture_path = os.path.join(scene_dir, "UVChecke.png").replace("\\", "/")
                     if os.path.exists(uv_texture_path):
                         tex = rt.Bitmaptexture()
                         tex.filename = uv_texture_path
