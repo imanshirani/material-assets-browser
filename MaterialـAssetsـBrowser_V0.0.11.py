@@ -1,6 +1,6 @@
 # ==========================
 # IMAN SHIRANI
-# 2025 V0.0.11 Corona & Vray
+# 2025 V0.0.12 Matcap Generator
 # ==========================
 
 # -*- coding: utf-8 -*-
@@ -78,8 +78,8 @@ def find_octane_max():
 # ==========================
 # Config Path Load & save 
 # ==========================
-CONFIG_PATH = os.path.join(os.path.expanduser("~"), "octane_asset_config.json")
-DEFAULT_MATERIAL_ROOT = "C:/OctaneMaterials/"
+CONFIG_PATH = os.path.join(os.path.expanduser("~"), "Material_asset_config.json")
+DEFAULT_MATERIAL_ROOT = "C:/Materials/"
 
 
 def load_config():
@@ -150,10 +150,10 @@ class SettingsDialog(QDialog):
         layout = QFormLayout(widget)
 
         layout.addRow("App Name:", QLabel("Material Asset Browser"))
-        layout.addRow("Version:", QLabel("v0.0.11"))
+        layout.addRow("Version:", QLabel("v0.0.12"))
         layout.addRow("Developer:", QLabel("IMAN SHIRANI"))
-        layout.addRow("Config Path:", QLabel(self.config.get("config_path", "Not Set")))
-        link = QLabel('<a href="https://github.com/yourrepo">GitHub Repo</a>')
+        #layout.addRow("Config Path:", QLabel(self.config.get("config_path", "Not Set")))
+        link = QLabel('<a href="https://github.com/imanshirani/material-assets-browser">GitHub Repo</a>')
         link.setOpenExternalLinks(True)
         layout.addRow("GitHub:", link)
         link = QLabel('<a href="https://www.paypal.com/donate/?hosted_button_id=LAMNRY6DDWDC4">Donate Link</a>')
@@ -223,7 +223,7 @@ class AssetBrowserWidget(QWidget):
         self.btn_up = QPushButton()
         up_icon = QIcon(os.path.join(self.icon_path, "up.ico"))
         if up_icon.isNull():
-            print("[DEBUG] up.png icon is NULL — fallback to text")
+            print("[DEBUG] up.png icon is NULL   fallback to text")
             self.btn_up.setText("Back To Folder")
         else:
             self.btn_up.setIcon(up_icon)
@@ -236,7 +236,7 @@ class AssetBrowserWidget(QWidget):
         self.btn_new_folder = QPushButton()
         folder_icon = QIcon(os.path.join(self.icon_path, "folder.ico"))
         if folder_icon.isNull():
-            print("[DEBUG] folder.png icon is NULL — fallback to text")
+            print("[DEBUG] folder.png icon is NULL   fallback to text")
             self.btn_new_folder.setText("New Folder")
         else:
             self.btn_new_folder.setIcon(folder_icon)
@@ -244,12 +244,25 @@ class AssetBrowserWidget(QWidget):
         self.btn_new_folder.setIconSize(QSize(18, 18))
         self.btn_new_folder.setFixedSize(32, 32)
         self.btn_new_folder.clicked.connect(self.create_folder)
+        
+        # Generate Matcap Icon
+        self.btn_generate_matcap = QPushButton()
+        matcap_icon = QIcon(os.path.join(self.icon_path, "matcap.ico")) # matcap.ico
+        if matcap_icon.isNull():
+            print("[DEBUG] matcap.ico icon is NULL   fallback to text")
+            self.btn_generate_matcap.setText("Generate Matcap")
+        else:
+            self.btn_generate_matcap.setIcon(matcap_icon)
+        self.btn_generate_matcap.setToolTip("Generate Matcap from selected image(s)") # tooltip updated
+        self.btn_generate_matcap.setIconSize(QSize(18, 18))
+        self.btn_generate_matcap.setFixedSize(32, 32)
+        self.btn_generate_matcap.clicked.connect(self.generate_matcaps_from_images) # <-- NEW METHOD
 
         #Refresh Icon
         self.btn_refresh = QPushButton()
         refresh_icon = QIcon(os.path.join(self.icon_path, "refresh.ico"))
         if refresh_icon.isNull():
-            print("[DEBUG] refresh.png icon is NULL — fallback to text")
+            print("[DEBUG] refresh.png icon is NULL   fallback to text")
             self.btn_refresh.setText("Refresh")
         else:
             self.btn_refresh.setIcon(refresh_icon)
@@ -262,7 +275,7 @@ class AssetBrowserWidget(QWidget):
         self.btn_settings = QPushButton()
         settings_icon = QIcon(os.path.join(self.icon_path, "settins.ico"))
         if settings_icon.isNull():
-            print("[DEBUG] settings.png icon is NULL — fallback to text")
+            print("[DEBUG] settings.png icon is NULL   fallback to text")
             self.btn_settings.setText("Setting")
         else:
             self.btn_settings.setIcon(settings_icon)
@@ -275,7 +288,7 @@ class AssetBrowserWidget(QWidget):
         self.btn_assign = QPushButton()
         assign_icon = QIcon(os.path.join(self.icon_path, "assign.ico"))
         if assign_icon.isNull():
-            print("[DEBUG] assign.ico icon is NULL — fallback to text")
+            print("[DEBUG] assign.ico icon is NULL   fallback to text")
             self.btn_assign.setText("Assign To Object")  # If no icon, use text
         else:
             self.btn_assign.setIcon(assign_icon)
@@ -291,6 +304,7 @@ class AssetBrowserWidget(QWidget):
         toolbar_layout.addWidget(self.btn_up)
         toolbar_layout.addWidget(self.btn_new_folder)
         toolbar_layout.addWidget(self.btn_refresh)
+        toolbar_layout.addWidget(self.btn_generate_matcap)
         toolbar_layout.addWidget(self.btn_settings)
         toolbar_layout.addWidget(self.btn_assign)
         toolbar_layout.addStretch()
@@ -366,35 +380,41 @@ class AssetBrowserWidget(QWidget):
                 "Hair_material","Layer_group","Layered_material","Material_Selector","Material_layer_switch",
                 "Material_switch","Metallic_layer","Metallic_material","Mix_material","Portal_material",
                 "Shadow_catcher_material","Sheen_layer","Specular_layer","Specular_material","Std_Surface_Mtl",
-                "Toon_material","Universal_material" 
+                "Toon_material","Universal_material",
+                "physicalmaterial", "standard" # <-- Add these
             ],            
             "redshift": [
                 "RS_Car_Paint", "RS_Contour", "RS_Hair", "RS_Incandescent", "RS_Material",
                 "RS_Material_Blender", "RS_Material_Output", "RS_Material_Switch", "RS_OpenPBR_Material",
                 "RS_OSL_Material", "RS_Principled_Hair", "RS_Random_Material_Switch", "RS_Ray_Switch_Material",
-                "RS_Skin", "RS_Sprite", "RS_SSS", "RS_Standard_Material", "RS_Standard_Volume", "RS_Store_Color_To_AOV", "RS_Surface"
+                "RS_Skin", "RS_Sprite", "RS_SSS", "RS_Standard_Material", "RS_Standard_Volume", "RS_Store_Color_To_AOV",
+                "physicalmaterial", "standard" # <-- Add these 
             ],
             "arnold": [
                 "ai_standard_surface", "ai_car_paint", "ai_standard_hair",
                 "ai_standard_volume", "ai_skin", "ai_shadow_mat",
                 "ai_wireframe", "ai_flat", "ai_layer_shader", "ai_mix_shader",
-                "standard_surface", "aistandard", "aistandardsurface"
+                "standard_surface", "aistandard", "aistandardsurface",
+                "physicalmaterial", "standard" # <-- Add these
             ],
             "fstorm": [
                 "FStormLightMat", "FStorm", "FStormMixMat","FStormOverrideMat", "FStormPortal",
-                "FStormProjectMat", "FStormSwitchMat", "FStormVolumeMat" 
+                "FStormProjectMat", "FStormSwitchMat", "FStormVolumeMat",
+                "physicalmaterial", "standard" # <-- Add these 
             ],
             "vray": [
                 "VRay2SidedMtl", "VRayALSurfaceMtl", "VRayBlendMtl", 
                 "VRayBumpMtl", "VRayCarPaintMtl", "VRayCarPaintMtl2", "VRayFastSSS2", 
                 "VRayFlakesMtl", "VRayFlakesMtl2", "VRayHairNextMtl", "VRayLightMtl", 
                 "VRayMDLMtl", "VRayMtl", "VRayMtlWrapper", "VRayOSLMtl", "VRayPluginNodeMtl", 
-                "VRayPointParticleMtl", "VRayScannedMtl", "VRayScatterVolume", "VRayStochasticFlakesMtl"
+                "VRayPointParticleMtl", "VRayScannedMtl", "VRayScatterVolume", "VRayStochasticFlakesMtl",
+                "physicalmaterial", "standard" # <-- Add these 
             ],
             "corona": [
                 "CoronaPhysicalMtl", "CoronaHairMtl", "CoronaLayeredMtl",
                 "CoronaLegacyMtl", "CoronaLightMtl", "CoronaRaySwitchMtl", "CoronaScannedMtl",
-                "CoronaSelectMtl", "CoronaShadowCatcherMtl","CoronaSkinMtl"
+                "CoronaSelectMtl", "CoronaShadowCatcherMtl","CoronaSkinMtl",
+                "physicalmaterial", "standard" # <-- Add these 
             ],
             "other": [
                 "physicalmaterial", "standard", "raytrace", "architectural",
@@ -543,7 +563,7 @@ class AssetBrowserWidget(QWidget):
         except Exception as e:
             print(f"[ERROR] assign_material_to_selection failed: {e}")  
 
-
+         
 # ==========================
 # Move selected materials to folder (multi-material safe)
 # ==========================
@@ -750,21 +770,55 @@ class AssetBrowserWidget(QWidget):
                     break
 
             if not mat:
-                self.log_status(f"[ERROR] Material '{mat_name}' not found in {mat_path}")
+                self.log_status(f"[ERROR] Material '{mat_name}' not found in {mat_path}", "error")
                 return
 
-            # Determine render engine type
+            # Determine render engine type based on material class
             class_name = str(rt.classOf(mat)).lower()
-            octane_classes = [cls.lower() for cls in self.allowed_classes.get("octane", [])]
-            redshift_classes = [cls.lower() for cls in self.allowed_classes.get("redshift", [])]
-            fstorm_classes = [cls.lower() for cls in self.allowed_classes.get("fstorm", [])]
-            corona_classes = [cls.lower() for cls in self.allowed_classes.get("corona", [])]
-            vray_classes = [cls.lower() for cls in self.allowed_classes.get("vray", [])]
-            is_octane = any(cls in class_name for cls in octane_classes)
-            is_redshift = any(cls in class_name for cls in redshift_classes)
-            is_fstorm = any(cls in class_name for cls in fstorm_classes)
-            is_corona = any(cls in class_name for cls in corona_classes)
-            is_vray = any(cls in class_name for cls in vray_classes)
+            
+            # --- START MODIFICATION FOR NUANCED ENGINE DETECTION ---
+            # Define truly native Octane classes that require Octane.max scene
+            # These are Octane's specific material types, EXCLUDING generic physical/standard materials
+            octane_native_specific_classes = [
+                cls.lower() for cls in self.allowed_classes.get("octane", [])
+                if cls.lower() not in ["physicalmaterial", "standard"]
+            ]
+            
+            # Check if the material is one of these truly native Octane-specific materials
+            is_octane_material_for_scene = any(cls in class_name for cls in octane_native_specific_classes)
+
+            # Define native Redshift classes
+            redshift_classes = [
+                cls.lower() for cls in self.allowed_classes.get("redshift", [])
+                if cls.lower() not in ["physicalmaterial", "standard"]            
+            ]
+            # Check if the material is one of these truly native Redshift-specific materials
+            is_redshift_material = any(cls in class_name for cls in redshift_classes)
+
+            # Define native FStorm classes
+            fstorm_classes = [
+                cls.lower() for cls in self.allowed_classes.get("fstorm", [])
+                if cls.lower() not in ["physicalmaterial", "standard"]
+            ]
+            # Check if the material is one of these truly native fstorm-specific materials
+            is_fstorm_material = any(cls in class_name for cls in fstorm_classes)
+
+            # Define native Corona classes
+            corona_classes = [
+                cls.lower() for cls in self.allowed_classes.get("corona", [])
+                if cls.lower() not in ["physicalmaterial", "standard"]
+            ]
+            # Check if the material is one of these truly native Corona-specific materials
+            is_corona_material = any(cls in class_name for cls in corona_classes)
+
+            # Define native Vray classes
+            vray_classes = [
+                cls.lower() for cls in self.allowed_classes.get("vray", [])
+                if cls.lower() not in ["physicalmaterial", "standard"]
+            ]
+            # Check if the material is one of these truly native Vray-specific materials
+            is_vray_material = any(cls in class_name for cls in vray_classes)
+            # --- END MODIFICATION FOR NUANCED ENGINE DETECTION ---
 
             # Thumbnail path
             mat_clean = re.sub(r'[^\w\-_\.]', '_', mat_name)
@@ -773,32 +827,66 @@ class AssetBrowserWidget(QWidget):
             self.log_status(f"[DEBUG] Thumbnail output path: {thumb_path}")
 
             if not running_inside_3dsmax():
-                self.log_status("[ERROR] This must run inside 3ds Max.")
+                self.log_status("[ERROR] This must run inside 3ds Max.", "error")
                 return
 
-            # === Octane, Redshift, Corona, vray or FStorm: Use Render Scene ===
-            if is_octane:
+            original_renderer = rt.renderers.current # Store the current renderer to restore later
+
+            # === Render with specific scene for truly native supported engine materials ===
+            scene_file = None
+            engine_label = "Generic/Scanline" # Default
+            
+            if is_octane_material_for_scene: # Use the new, more specific check
                 scene_file = os.path.join(scene_dir, "Octane.max").replace("\\", "/")
                 engine_label = "Octane"
-            elif is_redshift:
+                try:
+                    # Ensure Octane is the active renderer for truly native Octane materials
+                    rt.renderers.current = rt.Octane_Renderer()
+                except Exception as e:
+                    self.log_status(f"[WARNING] Could not set Octane Renderer: {e}", "warning")
+            elif is_redshift_material:
                 scene_file = os.path.join(scene_dir, "RedShift.max").replace("\\", "/")
                 engine_label = "Redshift"
-            elif is_fstorm:
+                try:
+                    rt.renderers.current = rt.Redshift_Renderer()
+                except Exception as e:
+                    self.log_status(f"[WARNING] Could not set Redshift Renderer: {e}", "warning")
+            elif is_fstorm_material:
                 scene_file = os.path.join(scene_dir, "FStorm.max").replace("\\", "/")
                 engine_label = "FStorm"
-            elif is_corona:
+                try:
+                    rt.renderers.current = rt.FStorm_Renderer()
+                except Exception as e:
+                    self.log_status(f"[WARNING] Could not set FStorm Renderer: {e}", "warning")
+            elif is_corona_material:
                 scene_file = os.path.join(scene_dir, "Corona.max").replace("\\", "/")
                 engine_label = "Corona"
-            elif is_vray:
+                try:
+                    rt.renderers.current = rt.CoronaRenderer() 
+                except Exception as e:
+                    self.log_status(f"[WARNING] Could not set Corona Renderer: {e}", "warning")
+            elif is_vray_material:
                 scene_file = os.path.join(scene_dir, "Vray.max").replace("\\", "/")
-                engine_label = "vray"
+                engine_label = "Vray"
+                try:
+                    rt.renderers.current = rt.V_Ray_Renderer()
+                except Exception as e:
+                    self.log_status(f"[WARNING] Could not set Vray Renderer: {e}", "warning")
             else:
-                scene_file = None
+                # If not a truly native specific renderer material, use a generic scene and force Scanline
+                # This handles PhysicalMaterials, Standard materials, and Matcaps (which are PhysicalMaterials with OSL)
+                try:
+                    rt.renderers.current = rt.Default_Scanline_Renderer() # Explicitly set to Scanline
+                    self.log_status("[DEBUG] Forced renderer to Default Scanline for generic material.")
+                except Exception as e:
+                    self.log_status(f"[WARNING] Could not set Default Scanline Renderer: {e}", "warning")
+
 
             if scene_file:
+                # Render using a pre-saved scene file
                 self.log_status(f"[DEBUG] Scene file selected: {scene_file}")
                 if not os.path.isfile(scene_file):
-                    self.log_status(f"[ERROR] Scene file does not exist: {scene_file}")
+                    self.log_status(f"[ERROR] Scene file does not exist: {scene_file}", "error")
                     return
 
                 self.log_status(f"[INFO] Rendering inside 3ds Max ({engine_label})...")
@@ -817,23 +905,23 @@ class AssetBrowserWidget(QWidget):
                     if os.path.exists(thumb_path):
                         self.log_status(f"[SUCCESS] Thumbnail rendered at: {thumb_path}")
                     else:
-                        self.log_status("[ERROR] Render did not produce output.")
-
+                        self.log_status("[ERROR] Render did not produce output.", "error")
+                    
                     self.log_status("[DEBUG] Calling resetMaxFile...")
                     rt.resetMaxFile(rt.name("noPrompt"))
                     self.log_status("[DEBUG] resetMaxFile done.")
                 else:
-                    self.log_status("[ERROR] Scene objects not found: Sphere001 or Cylinder001")
+                    self.log_status("[ERROR] Scene objects not found: Sphere001 or Cylinder001", "error")
                     return
-
             else:
-                # === Non-Octane/Redshift, Corona, vray or FStorm: Procedural scene render ===
+                # === Non-specific renderer material (e.g., Physical, Standard, Matcap): Procedural scene render with Scanline ===
                 try:
                     thumb_width, thumb_height = 128, 128
                     rt.renderWidth = thumb_width
                     rt.renderHeight = thumb_height
 
-                    sphere = rt.sphere(radius=25, segments=32, pos=rt.Point3(0, 0, 0))
+                    # Create simple scene for generic materials
+                    sphere = rt.sphere(radius=25, segments=32, pos=rt.Point3(0, 0, 0)) 
                     sphere.material = mat
                     uvwmod = rt.UVWMap()
                     uvwmod.mapping = rt.Name("spherical")
@@ -842,36 +930,25 @@ class AssetBrowserWidget(QWidget):
                     bg = rt.plane(length=300, width=300)
                     bg.rotation = rt.eulerangles(-50, 0, 0)
                     bg.position = rt.Point3(0, 35, 0)
-
                     uv_texture_path = os.path.join(scene_dir, "UVChecke.png").replace("\\", "/")
+
                     if os.path.exists(uv_texture_path):
                         tex = rt.Bitmaptexture()
                         tex.filename = uv_texture_path
-
-                        if self.active_render_engine == "arnold":
-                            bg_mat = rt.PhysicalMaterial()
-                            bg_mat.base_color_map = tex
-                        else:
-                            bg_mat = rt.standardMaterial()
-                            bg_mat.diffuseMap = tex
-                        bg.material = bg_mat
-
-                        uvw_bg = rt.UVWMap()
-                        uvw_bg.mapping = rt.Name("planar")
-                        rt.addModifier(bg, uvw_bg)
-
-                    if self.active_render_engine == "arnold":
-                        light = rt.Arnold_Light()
-                        light.type = 3
-                        light.width = 200
-                        light.height = 200
-                        light.position = rt.Point3(0, -100, 0)
-                        light.rotation = rt.eulerangles(90, 0, 0)
-                        light.intensity = 300
-                        light.castShadows = True
+                        bg_mat = rt.standardMaterial() # Use StandardMaterial for Scanline compatibility
+                        bg_mat.diffuseMap = tex
                     else:
-                        light = rt.omniLight()
-                        light.position = rt.Point3(50, -80, 100)
+                        bg_mat = rt.standardMaterial() # Fallback to a simple grey standard material
+                        bg_mat.diffuse = rt.color(100, 100, 100) # Neutral grey
+
+                    bg.material = bg_mat
+                    uvw_bg = rt.UVWMap()
+                    uvw_bg.mapping = rt.Name("planar")
+                    rt.addModifier(bg, uvw_bg)
+
+                    # Use a standard Omni light for generic scene
+                    light = rt.omniLight()
+                    light.position = rt.Point3(50, -80, 100)
 
                     cam = rt.freeCamera()
                     cam.position = rt.Point3(0, -70, 40)
@@ -879,36 +956,188 @@ class AssetBrowserWidget(QWidget):
                     rt.viewport.setCamera(cam)
                     cam.depthOfField = False
 
+                    self.log_status("[INFO] Rendering generic scene with Scanline...")
                     rt.render(camera=cam, width=thumb_width, height=thumb_height, vfb=False, outputfile=thumb_path)
 
                     if os.path.exists(thumb_path):
                         self.log_status(f"[SUCCESS] Thumbnail saved: {thumb_path}")
                     else:
-                        self.log_status(f"[ERROR] Thumbnail NOT saved: {thumb_path}")
+                        self.log_status(f"[ERROR] Thumbnail NOT saved: {thumb_path}", "error")
 
+                    # Clean up scene
                     rt.delete(sphere)
                     rt.delete(bg)
                     rt.delete(light)
                     rt.delete(cam)
 
                 except Exception as e:
-                    self.log_status(f"[EXCEPTION] Thumbnail render failed: {e}")
+                    self.log_status(f"[EXCEPTION] Generic thumbnail render failed: {e}", "error")
 
         except Exception as e:
-            self.log_status(f"[ERROR] Thumbnail generation failed: {e}")
-
+            self.log_status(f"[ERROR] Thumbnail generation failed: {e}", "error")
         finally:
+            # Always restore the original renderer
+            try:
+                rt.renderers.current = original_renderer
+                self.log_status(f"[DEBUG] Restored renderer to: {str(original_renderer)}")
+            except Exception as e:
+                self.log_status(f"[WARNING] Could not restore original renderer: {e}", "warning")
+
             if getattr(self, 'thumbnail_dialog', None):
                 try:
                     self.thumbnail_dialog.close()
                 except Exception as e:
-                    self.log_status(f"[WARNING] Could not close thumbnail dialog: {e}")
+                    self.log_status(f"[WARNING] Could not close thumbnail dialog: {e}", "warning")
                 self.thumbnail_dialog = None
-
             self.show_status_message("Ready", "orange")
             self.process_next_thumbnail()
 
+# ==========================
+# Generate Matcaps From Images
+# ==========================
+    def generate_matcaps_from_images(self):
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
+        import os
+        import shutil # Import the shutil module for file operations
+        from pymxs import runtime as rt # Ensure pymxs.runtime is imported
 
+        if not running_inside_3dsmax():
+            QMessageBox.critical(self, "Error", "This function must be run inside 3ds Max.")
+            return
+
+        # --- UPDATED CHECK: Ensure Scanline is the active renderer ---
+        try:
+            # Get the class name of the current renderer
+            current_renderer_class_name = str(rt.classof(rt.renderers.current))
+            
+            # Check if "Default_Scanline_Renderer" is part of the renderer's class name
+            # This makes sure the Matcap generation only works with Scanline.
+            if "Default_Scanline_Renderer" not in current_renderer_class_name:
+                QMessageBox.warning(self, "Warning", "Please set Scanline as the active production renderer to generate Matcaps.")
+                return # Stop the function execution if Scanline is not active
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Could not check active renderer: {e}\n"
+                                 "Please ensure 3ds Max is running and PyMXS is correctly configured.")
+            return
+        # --- END UPDATED CHECK ---
+
+        image_paths, _ = QFileDialog.getOpenFileNames(
+            self, "Select Matcap Image(s)", self.current_path, "Images (*.jpg *.jpeg *.png *.bmp *.tif *.exr)"
+        )
+        if not image_paths:
+            return
+
+        try:
+            # --- START MODIFICATION ---
+            # Get the base material root path from the config (JSON)
+            # Use DEFAULT_MATERIAL_ROOT as a fallback if "material_root" is not found in config
+            base_material_root = self.config.get("material_root", DEFAULT_MATERIAL_ROOT)
+            
+            # Define the final output directory for Matcaps as a subfolder within material_root
+            matcap_output_dir = os.path.join(base_material_root, "MatCap")
+            # --- END MODIFICATION ---
+
+        except Exception as e:
+            self.log_status(f"[ERROR] Could not determine material root or construct Matcap path: {e}", "error")
+            QMessageBox.critical(self, "Error", f"Could not determine material root or construct Matcap path.\n{e}")
+            return
+        
+        # --- DEBUGGING PRINT STATEMENT ---
+        print(f"[DEBUG] Calculated MatCap Output Directory: {matcap_output_dir}")
+        # --- END DEBUGGING PRINT STATEMENT ---
+
+        # Create the final MatCap output directory if it does not exist
+        try:
+            # Ensure the full path exists, including intermediate directories
+            os.makedirs(matcap_output_dir, exist_ok=True)
+            self.log_status(f"Ensured MatCap output directory exists: {matcap_output_dir}")
+        except Exception as e:
+            self.log_status(f"[ERROR] Could not create MatCap output directory: {e}", "error")
+            QMessageBox.critical(self, "Error", f"Could not create MatCap output directory: {matcap_output_dir}\n{e}")
+            return
+            
+        matcap_output_dir = matcap_output_dir.replace("\\", "/")
+
+        try:
+            max_install_root = str(rt.getDir(rt.name("maxroot")))
+            osl_dir = os.path.join(max_install_root, "OSL").replace("\\", "/")
+        except Exception as e:
+            self.log_status(f"[ERROR] Could not determine 3ds Max OSL directory: {e}", "error")
+            QMessageBox.critical(self, "Error", f"Could not determine 3ds Max OSL directory using rt.getDir #maxroot.\n{e}")
+            return
+            
+        matcap_osl = os.path.join(osl_dir, "MatCapUV.osl").replace("\\", "/")
+        bitmap_osl = os.path.join(osl_dir, "OSLBitmap2.osl").replace("\\", "/")
+
+        if not os.path.exists(matcap_osl):
+            QMessageBox.critical(self, "Error", f"MatCapUV.osl not found at: {matcap_osl}. Please ensure 3ds Max OSL files are installed correctly.")
+            return
+        if not os.path.exists(bitmap_osl):
+            QMessageBox.critical(self, "Error", f"OSLBitmap2.osl not found at: {bitmap_osl}. Please ensure 3ds Max OSL files are installed correctly.")
+            return
+
+        for image_path in image_paths:
+            image_name = os.path.splitext(os.path.basename(image_path))[0]
+            mat_name = f"Matcap_{image_name}"
+            
+            copied_image_filename = os.path.basename(image_path)
+            copied_image_path = os.path.join(matcap_output_dir, copied_image_filename)
+
+            try:
+                shutil.copy2(image_path, copied_image_path)
+                self.log_status(f"Copied image '{copied_image_filename}' to '{matcap_output_dir}'")
+            except Exception as e:
+                self.log_status(f"[ERROR] Could not copy image '{image_path}': {e}", "error")
+                QMessageBox.critical(self, "Image Copy Error", f"Failed to copy image '{image_name}':\n{e}")
+                continue
+
+            mat_path = os.path.join(matcap_output_dir, f"{mat_name}.mat").replace("\\", "/") 
+
+            mat_path_escaped = mat_path.replace("\\", "\\\\")
+            copied_image_path_escaped = copied_image_path.replace("\\", "\\\\")
+            matcap_osl_escaped = matcap_osl.replace("\\", "\\\\")
+            bitmap_osl_escaped = bitmap_osl.replace("\\", "\\\\")
+
+            ms_code = f'''
+                try(
+                    local physMat = PhysicalMaterial()
+                    physMat.name = "{mat_name}"
+                    
+                    physMat.base_color = (color 0 0 0)
+                    physMat.emit_color = (color 255 255 255)
+
+                    local uvwMatCap = OSLMap()
+                    uvwMatCap.OSLPath = @"{matcap_osl_escaped}"
+
+                    local bitmapLookup = OSLMap()
+                    bitmapLookup.OSLPath = @"{bitmap_osl_escaped}"
+                    bitmapLookup.Filename = @"{copied_image_path_escaped}"
+                    bitmapLookup.Pos_map = uvwMatCap
+
+                    physMat.emit_color_map = bitmapLookup
+
+                    local lib = MaterialLibrary()
+                    append lib physMat
+                    saveTempMaterialLibrary lib @"{mat_path_escaped}"
+                    "SUCCESS"
+                ) catch (err) (
+                    format "[ERROR] %\n" (getCurrentException())
+                    "ERROR"
+                )
+            '''
+            
+            try:
+                result = rt.execute(ms_code)
+                if result == "SUCCESS":
+                    self.enqueue_thumbnail(mat_path, mat_name)
+                else:
+                    QMessageBox.critical(self, "Material Creation Error", f"Failed to generate Matcap for {image_name}.\nMaxScript reported an error.")
+            except Exception as e:
+                print(f"[ERROR] MaxScript execution failed: {e}")
+                QMessageBox.critical(self, "Render Error", f"Failed to generate Matcap for {image_name}.\nPython execution error: {e}")
+            
+        self.load_folder(matcap_output_dir)
+            
 # ==========================  
 # split material library 
 # ========================== 
