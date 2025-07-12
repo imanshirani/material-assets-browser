@@ -8,13 +8,15 @@ Developed by: Iman Shirani
 A powerful and flexible material library manager for **3ds Max**, supporting multiple render engines including **Octane**, **RedShift**, **Fstorm**, **V-Ray**, **Arnold**, and **Corona**.
 
 ![screenshot](etc/screenshots/overview.jpg)
-
+![screenshot](etc/screenshots/MatCap.png)
+![screenshot](etc/screenshots/Vray.png)
 ---
 
 ## ✨ Features
 
 - 🔍 Real-time folder browsing
 - 🎨 Material preview thumbnails (auto-generated)
+- 🎡Matcap Generator(auto-generated)
 - 🖱️ Right-click context menu:
   - Rename / Delete
   - Assign to selected objects
