@@ -56,9 +56,9 @@ Thanks for your support! 🙏✨
 This project is licensed under the **MIT License**.
 
 You are free to:
-📦 Use — for commercial and non-commercial purposes
-🛠️ Modify — change the code as you wish
-🚀 Distribute — share it with others
+- 📦 Use — for commercial and non-commercial purposes
+- 🛠️ Modify — change the code as you wish
+- 🚀 Distribute — share it with others
 
 Just remember to include the original copyright notice.
 
