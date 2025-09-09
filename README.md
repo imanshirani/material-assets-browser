@@ -10,6 +10,7 @@ A powerful and flexible material library manager for 3ds Max, supporting multipl
 
 supporting multiple render engines including **Octane**, **RedShift**, **Fstorm**, **V-Ray**, **Arnold**, and **Corona**.
 
+![screenshot](overview1.jpg)
 ![screenshot](etc/screenshots/overview.jpg)
 ![screenshot](etc/screenshots/MatCap.png)
 ![screenshot](etc/screenshots/Vray.png)
