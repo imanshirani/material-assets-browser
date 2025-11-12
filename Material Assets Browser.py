@@ -1,6 +1,6 @@
 # ==========================
 # IMAN SHIRANI
-# 2025 V0.0.14 bugfix
+# 2025 V0.0.15 bugfix fir octane 2025.4_-_16.10 also 2026.1-Alpha3_-_26.02
 # ==========================
 
 # -*- coding: utf-8 -*-
@@ -381,6 +381,10 @@ class AssetBrowserWidget(QWidget):
                 "Material_switch","Metallic_layer","Metallic_material","Mix_material","Portal_material",
                 "Shadow_catcher_material","Sheen_layer","Specular_layer","Specular_material","Std_Surface_Mtl",
                 "Toon_material","Universal_material",
+                "0x3c35fce_0x20870143","0x3c35fce_0x20870142","0xd8968d8_0x3bd40f96",
+                "0x3c35fce_0x2087014b","0x3c35fce_0x2087014d","0x3c35fce_0x20870149",
+                "0x7ec72364_0x42803548","0x3c35fce_0x20870141","0x1b4a51da_0x797b5e17",
+                "0x3c35fce_0x2087013f","0x3c35fce_0x20870144","0x3c35fce_0x2087014e",
                 "physicalmaterial", "standard", "MaterialX_Material", "OpenPBR_Material", "materialx material", "materialxmat" #<-- Add these
             ],            
             "redshift": [
