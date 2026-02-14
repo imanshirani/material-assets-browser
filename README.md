@@ -39,7 +39,7 @@ Management and Efficiency
 ## 📦 Installation
 
 1. Copy the project folder to your **3ds Max scripts** directory.
-2. Launch `Material Assets Browser.py` from the **Scripting > Run Script...** menu.
+2. Launch `launch.py` from the **Scripting > Run Script...** menu.
 3. Set your material root folder from **Settings**.
 
 ---
