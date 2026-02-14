@@ -1,49 +1,53 @@
 import os
 import sys
 import importlib
-import logic
-import ui
+from PySide6.QtWidgets import QDockWidget, QApplication
+from PySide6.QtCore import Qt
 
 
-importlib.reload(logic)
-importlib.reload(ui)
+current_folder = os.path.dirname(os.path.realpath(__file__))
+if current_folder not in sys.path:
+    sys.path.insert(0, current_folder)
 
-from ui import AssetBrowserWidget
 
-# ==========================
-# Run inside 3ds Max
-# ==========================
+for mod in ["style", "logic", "ui"]:
+    if mod in sys.modules:
+        del sys.modules[mod]
+
+try:
+    import style
+    import logic
+    import ui
+    importlib.reload(style)
+    importlib.reload(logic)
+    importlib.reload(ui)
+    from ui import AssetBrowserWidget
+    print(f"[SUCCESS] Modules loaded from: {current_folder}")
+except Exception as e:
+    print(f"[CRITICAL ERROR] Failed to load modules: {e}")
+
 def show_in_max():
-    try:
-        from qtmax import GetQMaxMainWindow
-    except ImportError:
-        raise ImportError("qtmax module not available. This must be run inside 3ds Max 2022+.")
-
-    from PySide6.QtWidgets import QApplication
+    from qtmax import GetQMaxMainWindow
     app = QApplication.instance()
-
     main_window = GetQMaxMainWindow()
 
+    
     for widget in app.allWidgets():
-        if isinstance(widget, QDockWidget) and widget.windowTitle() == "Octane Folder Explorer":
+        if isinstance(widget, QDockWidget) and widget.windowTitle() == "Octane Asset Browser":
             widget.close()
+            widget.deleteLater()
+
+    class DockableShelf(QDockWidget):
+        def __init__(self, parent=None):
+            super().__init__(parent)
+            self.setWindowTitle("Octane Asset Browser")
+            self.setObjectName("OctaneAssetBrowserDock")
+            self.shelf_tool = AssetBrowserWidget()
+            self.setWidget(self.shelf_tool)
 
     dock = DockableShelf(parent=main_window)
-    app.installEventFilter(dock.shelf_tool)  # DockableShelf
     main_window.addDockWidget(Qt.RightDockWidgetArea, dock)
     dock.show()
-    
-class DockableShelf(QDockWidget):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Octane Asset Browser")
-        self.shelf_tool = AssetBrowserWidget()
-        self.setWidget(self.shelf_tool)
 
-
-from qtmax import GetQMaxMainWindow
-
-main_window = GetQMaxMainWindow()
-dockable_window = DockableShelf()
-main_window.addDockWidget(Qt.RightDockWidgetArea, dockable_window)
-dockable_window.show()
+if __name__ == "__main__":
+    show_in_max()

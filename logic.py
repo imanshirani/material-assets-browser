@@ -37,7 +37,7 @@ def running_inside_3dsmax():
 # ==========================
 def find_3dsmaxcmd():
     # Version Of 3ds max
-    preferred_versions = ["2025", "2026"]
+    preferred_versions = ["2025", "2026", "2027"]
 
     for version in preferred_versions:
         exe_path = fr"C:\Program Files\Autodesk\3ds Max {version}\3dsmaxcmd.exe"

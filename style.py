@@ -1,5 +1,5 @@
 
-DARK_THEME = MAIN_STYLE
+
 MAIN_STYLE = """
 QWidget {
     background-color: #2b2b2b;
@@ -78,6 +78,7 @@ QScrollBar::handle:vertical:hover {
 }
 """
 
+DARK_THEME = MAIN_STYLE
 
 BTN_ACTION = """
 QPushButton {
