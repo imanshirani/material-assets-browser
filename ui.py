@@ -1,5 +1,8 @@
 from logic import *
 import style
+from PySide6.QtWidgets import QGroupBox 
+import constants
+
 
 # ==========================
 # Main Asset Browser
@@ -8,36 +11,65 @@ class AssetBrowserWidget(QWidget):
     def __init__(self):              
         super().__init__()
         self.setStyleSheet(style.MAIN_STYLE)
-
-        
         self.setMinimumSize(800, 600)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
-        import os
-        import inspect
+        import os, inspect
         from collections import deque
-        self.thumbnail_queue = deque()
-        self.thumbnail_processing = False
-        self.render_queue = deque()
-        self.is_rendering = False
 
-        self.config = load_config()
-        self.active_render_engine = self.detect_active_render_engine()        
-        self.root_path = self.config.get("material_root", DEFAULT_MATERIAL_ROOT)
-        self.current_path = self.root_path
-        
-        #thumbnail queue
+        # Thumbnail queue
         self.thumbnail_queue = deque()
         self.thumbnail_running = False
         self.thumbnail_processing = False
-        
-        #move Folder
+        self.render_queue = deque()
+        self.is_rendering = False
         self._move_in_progress = False
-        self.context_menu = None
-        self.clicked_item_data = None
-        
-        #Material cache
         self.material_class_cache = {}
+        
+        self.config = load_config()
+        self.active_render_engine = self.detect_active_render_engine()        
+        self.root_path = self.config.get("material_root", constants.DEFAULT_MATERIAL_ROOT)
+        self.current_path = self.root_path
+
+        # ---Main Layout---
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.setContentsMargins(8, 8, 8, 8)
+        self.main_layout.setSpacing(10)
+
+        # ---(System Info)---
+        self.group_info = QGroupBox("System Info")
+        self.group_info.setFixedHeight(70) 
+        
+        self.header_layout = QHBoxLayout(self.group_info)
+        self.header_layout.setContentsMargins(15, 0, 15, 10)
+
+        # Left Side
+        self.info_v_layout = QVBoxLayout()
+        self.info_v_layout.setSpacing(2)
+        
+        self.app_title = QLabel(constants.PRODUCT_NAME)
+        self.app_title.setObjectName("SystemInfoLabel")        
+        self.app_version = QLabel(f"Version: {constants.VERSION}")
+        self.app_version.setObjectName("VersionLabel")        
+        self.info_v_layout.addWidget(self.app_title)
+        self.info_v_layout.addWidget(self.app_version)
+        self.header_layout.addLayout(self.info_v_layout)
+        
+        self.header_layout.addStretch()
+
+        
+        self.btn_settings_header = QPushButton("  Settings / About")
+        self.btn_settings_header.setObjectName("HeaderSettingsBtn") 
+        current_dir = os.path.dirname(inspect.getfile(inspect.currentframe()))
+        self.icon_path = os.path.join(current_dir, "etc", "icon").replace("\\", "/")
+        
+        settings_icon = QIcon(os.path.join(self.icon_path, "settins.ico"))
+        self.btn_settings_header.setIcon(settings_icon)
+        self.btn_settings_header.setFixedSize(140, 40)
+        self.btn_settings_header.setCursor(Qt.PointingHandCursor)
+        self.btn_settings_header.clicked.connect(self.open_settings)
+        
+        self.header_layout.addWidget(self.btn_settings_header)
+        self.main_layout.addWidget(self.group_info)
         
         #PBR PATH
         #self.pbr_output_path = os.path.join(self.root_path, "PBR Material", "pbr_library.mat")
@@ -130,16 +162,21 @@ class AssetBrowserWidget(QWidget):
         self.btn_assign.clicked.connect(self.assign_selected_material)
         
         
+        # Navigation buttons layout
+        self.group_tools = QGroupBox("Navigation & Tools")
+        self.group_tools.setFixedHeight(60) 
+        tools_layout = QVBoxLayout(self.group_tools)
+        tools_layout.setContentsMargins(15, 0, 15, 10)
+        tools_layout.setSpacing(8)
 
-        toolbar_layout = QHBoxLayout()
-        toolbar_layout.setSpacing(6)
-        toolbar_layout.addWidget(self.btn_up)
-        toolbar_layout.addWidget(self.btn_new_folder)
-        toolbar_layout.addWidget(self.btn_refresh)
-        toolbar_layout.addWidget(self.btn_generate_matcap)
-        toolbar_layout.addWidget(self.btn_settings)
-        toolbar_layout.addWidget(self.btn_assign)
-        toolbar_layout.addStretch()
+        top_tools_layout = QHBoxLayout()
+        top_tools_layout.setSpacing(6)
+        top_tools_layout.addWidget(self.btn_up)
+        top_tools_layout.addWidget(self.btn_new_folder)
+        top_tools_layout.addWidget(self.btn_refresh)
+        top_tools_layout.addWidget(self.btn_generate_matcap)
+        top_tools_layout.addWidget(self.btn_assign)
+        top_tools_layout.addStretch()
 
         # --- Path bar ---
         self.path_display = QLineEdit()
@@ -152,23 +189,30 @@ class AssetBrowserWidget(QWidget):
 
         # --- Search bar ---
         self.search_bar = QLineEdit()
-        self.search_bar.setPlaceholderText("Search...")
-        self.search_bar.setStyleSheet(style.MAIN_STYLE)
+        self.search_bar.setPlaceholderText("Search materials...")
         self.search_bar.textChanged.connect(self.filter_items)
+        tools_layout.addLayout(top_tools_layout)
+        tools_layout.addWidget(self.search_bar)
+        self.main_layout.addWidget(self.group_tools)
 
         # --- Main asset list ---
         self.asset_list = QListWidget()
         self.asset_list.setViewMode(QListWidget.IconMode)
-        self.asset_list.setIconSize(QSize(128, 128))
-        self.asset_list.setGridSize(QSize(140, 160))
+        self.asset_list.setGridSize(QSize(180, 260))
+        self.asset_list.setIconSize(QSize(150, 140))
+        self.asset_list.setSpacing(10)
+        self.asset_list.setWordWrap(True)
         self.asset_list.setResizeMode(QListWidget.Adjust)
-        self.asset_list.setWrapping(True)
-        self.asset_list.setWordWrap(False)
-        self.asset_list.setSpacing(8)
+        self.asset_list.setMovement(QListWidget.Static)
+
+        
         self.asset_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.asset_list.customContextMenuRequested.connect(self.show_context_menu)
         self.asset_list.itemDoubleClicked.connect(self.handle_double_click)
         self.asset_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.asset_list.setSelectionBehavior(QAbstractItemView.SelectItems)
+        self.asset_list.setDragEnabled(False)
+        
         self.asset_list.setDragEnabled(False)
         self.asset_list.setAcceptDrops(False)
         #self.asset_list.setDragDropMode(QListWidget.NoDragDrop)    
@@ -242,15 +286,20 @@ class AssetBrowserWidget(QWidget):
                 "MaterialX_Material", "OpenPBR_Material", "materialx material", "materialxmat"
             ]}
             
-        # --- Main layout ---
-        main_layout = QVBoxLayout()
-        main_layout.addWidget(self.path_display)
-        main_layout.addLayout(toolbar_layout)
-        main_layout.addWidget(self.search_bar)
-        main_layout.addWidget(scroll)
-        main_layout.addWidget(self.status_label)
 
-        self.setLayout(main_layout)
+        
+        
+       
+        # --- Main layout ---
+        self.main_layout.addWidget(self.path_display)
+        self.main_layout.addWidget(self.search_bar)
+        self.main_layout.addWidget(scroll)
+        self.main_layout.addWidget(self.status_label)
+        # --- loaderunit ---
+        from loader_utils import BatchLoader
+        self.loader = BatchLoader(self, items_per_page=10)
+        self.asset_list.verticalScrollBar().valueChanged.connect(self.handle_lazy_scroll)
+        self.setLayout(self.main_layout)
         self.load_folder(self.current_path)
 
 # ==========================
@@ -385,7 +434,21 @@ class AssetBrowserWidget(QWidget):
         except Exception as e:
             print(f"[ERROR] assign_material_to_selection failed: {e}")  
 
-         
+
+# ==========================
+# Update Card Selection
+# ==========================
+    def update_card_selection(self):
+        
+        for i in range(self.asset_list.count()):
+            item = self.asset_list.item(i)
+            card = self.asset_list.itemWidget(item)
+            if card:
+                
+                is_selected = item.isSelected()
+                card.setProperty("selected", "true" if is_selected else "false")
+                card.style().unpolish(card)
+                card.style().polish(card)        
 # ==========================
 # Move selected materials to folder (multi-material safe)
 # ==========================
@@ -1255,131 +1318,163 @@ class AssetBrowserWidget(QWidget):
    
 # ==========================
 # Load Folder Contents
-# ==========================    
+# ========================== 
+    def handle_card_selection(self, card_obj):
+        
+        data = card_obj.data
+        if "::" in data:
+            mat_path, mat_name = data.split("::")
+            self.assign_material_to_selection(mat_path, mat_name)
+            self.show_status_message(f"Material '{mat_name}' assigned.", "green") 
+
     def load_folder(self, path):
-        print("[DEBUG] load_folder called with path:", path)
-        
         import os
-        import re
-        
-        print(f"--- DEBUG: CHECKING CONTENTS OF PATH: {path} ---")
-        print(f"--- FILES FOUND BY SCRIPT: {os.listdir(path)} ---")
-        from pymxs import runtime as rt
-        from PySide6.QtGui import QPixmap
+        from PySide6.QtCore import Qt, QSize
+        from PySide6.QtWidgets import QListWidgetItem, QLabel
 
         
         self.asset_list.clear()
-        if not os.path.isdir(path):
-            return
-
+        self.all_items_to_load = [] 
+        self.current_loaded_index = 0
         self.current_path = path
-        self.path_display.setText(self.current_path.replace("\\", "/"))
-        
-        # Split any multi-material .mat files
-        # ==========================
-        for file in os.listdir(path):
-            if file.lower().endswith(".mat"):
-                full_path = os.path.join(path, file).replace("\\", "/")
-                self.split_material_library(full_path)
+        self.path_display.setText(path.replace("\\", "/"))
 
-        # --- Load and display materials + cache class ---
-        # ==========================
-        
+        if not os.path.isdir(path): return
 
-        # ==========================
-        for item in sorted(os.listdir(path)):
-            item_path = os.path.join(path, item)
+        
+        all_items = sorted(os.listdir(path))
+        for item in all_items:
+            item_path = os.path.join(path, item).replace("\\", "/")
 
             if os.path.isdir(item_path):
-                icon_file = os.path.join(item_path, "icon.png")
-                thumb_file = os.path.join(item_path, f"{item}.jpg")
+                self.add_folder_item(item_path, item) 
 
-                if os.path.exists(icon_file):
-                    icon = QIcon(QPixmap(icon_file))
-                elif os.path.exists(thumb_file):
-                    icon = QIcon(QPixmap(thumb_file))
-                else:
-                    default_pixmap = QPixmap(128, 128)
-                    default_pixmap.fill(Qt.black)  # Box color
-                    icon = QIcon(default_pixmap)
-
-                # PBR folder detection
-                # ==========================
-                display_name = item
-                if self.is_pbr_folder(item_path):
-                    display_name += " [PBR]"
-
-                entry = QListWidgetItem(icon, display_name)
-                entry.setData(Qt.UserRole, item_path)
-                self.asset_list.addItem(entry)
-
-            # ==========================
-            # Material Library (.mat) File
-            # ==========================
-            elif item.lower().endswith(".mat"):
-                mat_path = os.path.join(path, item).replace("\\", "/")
-                try:
-                    lib = rt.loadTempMaterialLibrary(mat_path)
-
-                    for i in range(lib.count):
-                        mat = lib[i]
-                        mat_name = mat.name
-
-                        try:
-                            mat_class = rt.classOf(mat).name.lower()
-                        except:
-                            classof = rt.classOf(mat)
-                            mat_class = str(classof.name).lower() if hasattr(classof, "name") else str(classof).lower()
-
-                        print(f"[DEBUG] Mat name: {mat_name}, class: {mat_class}")
-
-                        if not mat_class:
-                            print(f"[SKIP] {mat_name} has no valid class.")
-                            continue
-
-                        if not self.is_material_class_allowed(mat):
-                            print(f"[SKIP] '{mat.name}' skipped (class not allowed)")
-                            continue
-
-                        print(f"[?] Accepted material: {mat_name}")
-
-                        # Generate potential thumbnail names (default + fallback)
-                        # ==========================
-                        mat_clean = re.sub(r'[^\w\-_\.]', '_', mat.name)
-                        thumb_path = os.path.join(os.path.dirname(mat_path), f"{mat_name}.jpg").replace("\\", "/")
-
-
-                        # Check if it already exists (optional fallback logic)
-                        if not os.path.exists(thumb_path):
-                            print(f"[AUTO-GEN] Enqueue thumbnail: {thumb_path}")
-                            self.enqueue_thumbnail(mat_path, mat.name)
-
-                        
-
-                        # Queue thumbnail generation if not found
-                        # ==========================
-                        if not thumb_path:
-                            print(f"[TODO] Enqueue thumbnail for: {mat_name}")
-                            self.enqueue_thumbnail(mat_path, mat_name)
-
-                        icon = QIcon(QPixmap(thumb_path)) if thumb_path and os.path.exists(thumb_path) else QIcon.fromTheme("document")
-
-                        entry = QListWidgetItem(icon, mat_name)
-                        entry.setData(Qt.UserRole, f"{mat_path}::{mat_name}")
-                        self.asset_list.addItem(entry)
-
-                except Exception as e:
-                    print(f"[ERROR] Cannot load .mat file: {e}")
-            # ==========================
-            # MaterialX Library (.mtlx) File
-            # ==========================
             elif item.lower().endswith(".mtlx"):
                 mtlx_name = os.path.splitext(item)[0]
                 icon = QIcon(os.path.join(self.icon_path, "MatX.png"))                
                 entry = QListWidgetItem(icon, mtlx_name + " (.mtlx)")
                 entry.setData(Qt.UserRole, item_path)
+                entry.setTextAlignment(Qt.AlignCenter)
                 self.asset_list.addItem(entry)
 
+            elif item.lower().endswith(".mat"):
+                self.all_items_to_load.append(item_path)
+
+        
+        self.loader.setup(self.all_items_to_load)
+
+    
+    def add_folder_item(self, item_path, item_name):
+        
+        custom_folder_icon = os.path.join(self.icon_path, "folder.ico").replace("\\", "/")
+        icon_file = os.path.join(item_path, "icon.png")
+        thumb_file = os.path.join(item_path, f"{item_name}.jpg")
+
+        if os.path.exists(icon_file): icon = QIcon(QPixmap(icon_file))
+        elif os.path.exists(thumb_file): icon = QIcon(QPixmap(thumb_file))
+        elif os.path.exists(custom_folder_icon): icon = QIcon(QPixmap(custom_folder_icon))
+        else:
+            dark_pix = QPixmap(128, 128)
+            dark_pix.fill(QColor("#252525"))
+            icon = QIcon(dark_pix)
+
+        display_name = item_name
+        if self.is_pbr_folder(item_path): display_name += " [PBR]"
+
+        entry = QListWidgetItem(self.asset_list)
+        entry.setSizeHint(QSize(160, 240))
+        entry.setData(Qt.UserRole, item_path)
+        entry.setIcon(icon)
+
+        folder_html = style.HTML_FOLDER_STYLE.format(name=display_name.upper())
+        label = QLabel(folder_html)
+        label.setAlignment(Qt.AlignCenter)
+        label.setStyleSheet("background: transparent; border: none; padding-bottom: 5px;")
+        
+        self.asset_list.addItem(entry)
+        self.asset_list.setItemWidget(entry, label)
+
+    def add_material_item(self, mat_path):
+        try:
+            from pymxs import runtime as rt
+            lib = rt.loadTempMaterialLibrary(mat_path)
+            if not lib or lib.count == 0: return
+
+            mat = lib[0] 
+            mat_name = mat.name
+            thumb_path = os.path.join(os.path.dirname(mat_path), f"{mat_name}.jpg").replace("\\", "/")
+
+            entry = QListWidgetItem(self.asset_list)
+            entry.setSizeHint(QSize(160, 240))
+            entry.setData(Qt.UserRole, f"{mat_path}::{mat_name}")
+            
+           
+            icon_file = thumb_path if os.path.exists(thumb_path) else os.path.join(self.icon_path, "matcap.ico")
+            entry.setIcon(QIcon(icon_file))
+
+            card_html = style.HTML_CARD_STYLE.format(name=mat_name.upper())
+            label = QLabel(card_html)
+            label.setAlignment(Qt.AlignCenter)
+            self.asset_list.setItemWidget(entry, label)
+        except Exception as e:
+            print(f"[ERROR] Failed to add item: {e}")
+
+# ==========================
+# Rename And Delete Material
+# ==========================
+    def delete_material(self, mat_path, mat_name):
+        
+        from pymxs import runtime as rt
+        from PySide6.QtWidgets import QMessageBox
+        import os
+
+        confirm = QMessageBox.question(self, "Delete Material", f"Delete material '{mat_name}'?", QMessageBox.Yes | QMessageBox.No)
+        if confirm != QMessageBox.Yes: return
+
+        ms_code = f'''
+        try (
+            local lib = loadTempMaterialLibrary @"{mat_path}"
+            for i = lib.count to 1 by -1 do (
+                if lib[i].name == "{mat_name}" then deleteItem lib i
+            )
+            saveTempMaterialLibrary lib @"{mat_path}"
+            true
+        ) catch ( false )
+        '''
+        if rt.execute(ms_code):
+            
+            thumb_path = os.path.join(os.path.dirname(mat_path), f"{mat_name}.jpg")
+            if os.path.exists(thumb_path): os.remove(thumb_path)
+            self.load_folder(self.current_path)
+            self.show_status_message(f"Deleted material '{mat_name}'", "orange")
+
+    def rename_material(self, mat_path, old_name):
+        from pymxs import runtime as rt
+        from PySide6.QtWidgets import QInputDialog, QMessageBox
+        import os
+
+        new_name, ok = QInputDialog.getText(self, "Rename Material", f"New name for '{old_name}':", text=old_name)
+        if not ok or not new_name or new_name == old_name:
+            return
+
+        ms_code = f'''
+        try (
+            local lib = loadTempMaterialLibrary @"{mat_path}"
+            for i = 1 to lib.count do (
+                if lib[i].name == "{old_name}" then ( lib[i].name = "{new_name}"; exit )
+            )
+            saveTempMaterialLibrary lib @"{mat_path}"
+            true
+        ) catch ( false )
+        '''
+        if rt.execute(ms_code):
+            thumb_dir = os.path.dirname(mat_path)
+            old_thumb = os.path.join(thumb_dir, f"{old_name}.jpg")
+            new_thumb = os.path.join(thumb_dir, f"{new_name}.jpg")
+            if os.path.exists(old_thumb):
+                os.rename(old_thumb, new_thumb)
+            self.load_folder(self.current_path)
+            self.show_status_message(f"Renamed '{old_name}' to '{new_name}'", "green")
 
 
     
@@ -1387,11 +1482,18 @@ class AssetBrowserWidget(QWidget):
 # double_click
 # ==========================
     def handle_double_click(self, item):
-        path = item.data(Qt.UserRole)
-        if os.path.isdir(path):
-            self.load_folder(path)
-        elif isinstance(path, str) and ".mat::" in path:
-            print(f"[DEBUG] Double clicked material: {path}")
+        path_data = item.data(Qt.UserRole) 
+        if not path_data: return
+
+        
+        if os.path.isdir(path_data):
+            self.load_folder(path_data)
+        
+        
+        elif "::" in path_data:
+            mat_path, mat_name = path_data.split("::")
+            print(f"Executing INSERT for: {mat_name}")
+            self.assign_material_to_selection(mat_path, mat_name)
 
 # ==========================
 # UP 
@@ -1435,6 +1537,7 @@ class AssetBrowserWidget(QWidget):
         for file in os.listdir(folder_path):
             if file.lower().endswith(".mat"):
                 full_path = os.path.join(folder_path, file).replace("\\", "/")
+                
                 try:
                     lib = rt.loadTempMaterialLibrary(full_path)
                     if lib and lib.count > 0:
@@ -1512,6 +1615,7 @@ class AssetBrowserWidget(QWidget):
         is_mat = "::" in path and path.lower().endswith(".mat::" + path.split("::")[-1].lower())
         is_orbx = "::" in path and path.lower().endswith(".orbx::orbx")
         is_mtlx_file = isinstance(path, str) and path.lower().endswith(".mtlx")
+        
         
 
         # ORBX File
@@ -1964,7 +2068,46 @@ class AssetBrowserWidget(QWidget):
         #MaterialX Genration
         elif is_mtlx_file and action == make_mtlx_action:
                 self.create_materialx_from_file(path)
-            
+# ==========================
+# Rename And Delete Folders
+# ==========================
+    def rename_folder_path(self, folder_path):
+        
+        import os
+        from PySide6.QtWidgets import QInputDialog, QMessageBox
+        
+        old_name = os.path.basename(folder_path)
+        new_name, ok = QInputDialog.getText(self, "Rename Folder", "New Name:", text=old_name)
+        
+        if ok and new_name and new_name != old_name:
+            new_path = os.path.join(os.path.dirname(folder_path), new_name)
+            try:
+                os.rename(folder_path, new_path)
+                self.load_folder(self.current_path) 
+                self.show_status_message(f"Folder renamed to '{new_name}'", "green")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Rename failed: {e}")
+
+    def delete_folder_path(self, folder_path):
+        import shutil
+        from PySide6.QtWidgets import QMessageBox
+        
+        confirm = QMessageBox.question(
+            self, "Confirm Delete", 
+            f"Are you sure you want to delete this folder and ALL its contents?\n\n{folder_path}",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        
+        if confirm == QMessageBox.Yes:
+            try:
+                shutil.rmtree(folder_path)
+                self.load_folder(self.current_path)
+                self.show_status_message("Folder deleted.", "orange")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Delete failed: {e}")
+
+    
+
 # ==========================
 # Filter Items
 # ==========================
@@ -2029,16 +2172,30 @@ class AssetBrowserWidget(QWidget):
         except Exception as e:
             print(f"[ERROR] get_mat_class() failed for {mat_path}: {e}")
             return None
-
-       
-                    
+        
+# ==========================
+# handle_lazy_scroll
+# ==========================       
+    def handle_lazy_scroll(self, value):
+        scrollbar = self.asset_list.verticalScrollBar()
+        if value > scrollbar.maximum() * 0.8:
+            self.loader.load_next()         
 # ==========================
 # open_settings
 # ==========================
     def open_settings(self):
-        dlg = SettingsDialog(self, self.config)
-        dlg.exec()
-        self.root_path = self.config.get("material_root", DEFAULT_MATERIAL_ROOT)
-        self.load_folder(self.root_path)
-
-
+       
+        from settings_dialog import SettingsDialog
+        
+       
+        dlg = SettingsDialog(self, current_path=self.root_path)
+        
+        if dlg.exec():
+            new_path = dlg.get_path()
+            if new_path and new_path != self.root_path:
+                self.config["material_root"] = new_path
+                from logic import save_config
+                save_config(self.config)
+                
+                self.root_path = new_path
+                self.load_folder(self.root_path)

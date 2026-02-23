@@ -10,6 +10,7 @@ import subprocess
 import inspect  
 import platform
 from collections import deque, Counter
+from settings_dialog import SettingsDialog
 
 from PySide6.QtWidgets import (
     QApplication, QWidget, QLabel, QVBoxLayout, QListWidget, QProgressBar, QAbstractItemView,
@@ -161,37 +162,7 @@ class SettingsDialog(QDialog):
 
         return widget
 
-    def create_about_tab(self):
-        widget = QWidget()
-        layout = QVBoxLayout(widget) # استفاده از QVBoxLayout برای کنترل بهتر چیدمان
-        
-        # بخش اطلاعات متنی
-        info_layout = QFormLayout()
-        info_layout.addRow("App Name:", QLabel("Material Asset Browser"))
-        info_layout.addRow("Version:", QLabel("v0.0.16"))
-        info_layout.addRow("Developer:", QLabel("IMAN SHIRANI"))
-        layout.addLayout(info_layout)
-
-        # ایجاد ردیف دکمه‌ها (مشابه سبکی که خواستید)
-        btn_box = QHBoxLayout()
-        
-        # دکمه گیت‌هاب
-        self.btn_github = QPushButton("GitHub Repo")
-        self.btn_github.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/imanshirani/material-assets-browser")))
-        self.btn_github.setStyleSheet(style.BTN_GITHUB)
-        btn_box.addWidget(self.btn_github)
-        
-        # دکمه دونیت با استایل خاص
-        self.btn_donate = QPushButton("Donate")
-        self.btn_donate.setStyleSheet("background-color: #0070ba; color: white; font-weight: bold;")
-        self.btn_donate.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://www.paypal.com/donate/?hosted_button_id=LAMNRY6DDWDC4")))
-        self.btn_donate.setStyleSheet(style.BTN_DONATE)
-        btn_box.addWidget(self.btn_donate)
-        
-        layout.addLayout(btn_box)
-        layout.addStretch() # هل دادن محتوا به سمت بالا
-
-        return widget
+    
 
     def change_material_path(self):
         dir_path = QFileDialog.getExistingDirectory(self, "Select Material Root Folder")
