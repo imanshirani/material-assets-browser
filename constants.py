@@ -1,10 +1,10 @@
 import os
 
 # --- PRODUCT INFO ---
-PRODUCT_NAME = "Material Asset Browser"
-WINDOW_TITLE = "Material Asset Browser"
-DOCK_OBJECT_NAME = "MaterialAssetBrowserDock"
-VERSION = "0.0.17 Beta"
+PRODUCT_NAME = "Material Assets Browser"
+WINDOW_TITLE = "Material Assets Browser"
+DOCK_OBJECT_NAME = "MaterialAssetsBrowserDock"
+VERSION = "0.0.18 Beta"
 AUTHOR = "Iman Shirani"
 DEVELOPER_TAG = "Developed by IMAN SHIRANI"
 
