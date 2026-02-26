@@ -29,7 +29,7 @@ class SettingsDialog(QtWidgets.QDialog):
         
         info_text = (
             f"<span style='color:#888;'>Version:</span> <span style='color:#ddd;'>{constants.VERSION}</span><br>"
-            f"<span style='color:#888;'>Author:</span> <span style='color:#ddd;'>{constants.AUTHOR}</span>"
+            f"<span style='color:#ddd;'>{constants.DEVELOPER_TAG}</span>"
         )
         self.info_label = QtWidgets.QLabel(info_text)
         self.info_label.setStyleSheet("font-size: 11px; line-height: 160%;")

@@ -200,9 +200,9 @@ class AssetBrowserWidget(QWidget):
         self.asset_list.setViewMode(QListWidget.IconMode)
         self.asset_list.setGridSize(QSize(180, 260))
         self.asset_list.setIconSize(QSize(150, 140))
-        self.asset_list.setSpacing(10)
+        self.asset_list.setSpacing(8)
         self.asset_list.setWordWrap(True)
-        self.asset_list.setResizeMode(QListWidget.Adjust)
+        self.asset_list.setResizeMode(QListWidget.Adjust) 
         self.asset_list.setMovement(QListWidget.Static)
 
         

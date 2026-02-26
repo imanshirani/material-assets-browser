@@ -1,10 +1,10 @@
-# loader_utils.py
+
 import os
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import QListWidgetItem, QLabel
 from PySide6.QtGui import QIcon, QPixmap
 
-# loader_utils.py
+
 class BatchLoader:
     def __init__(self, browser_widget, items_per_page=20):
         self.browser = browser_widget
@@ -29,9 +29,11 @@ class BatchLoader:
 
         print(f">>> [DEBUG] Loading Batch: {self.current_index} to {self.current_index + self.items_per_page}")
 
-        self.browser.asset_list.setUpdatesEnabled(False)
         
-        # split items
+        scrollbar = self.browser.asset_list.verticalScrollBar()
+        current_scroll_position = scrollbar.value()        
+        self.browser.asset_list.setUpdatesEnabled(False)    
+        
         end = self.current_index + self.items_per_page
         batch = self.all_items[self.current_index:end]
         
@@ -40,8 +42,13 @@ class BatchLoader:
             self.browser.add_material_item(mat_path) 
             
         self.current_index = end
+        
+        
         self.browser.asset_list.setUpdatesEnabled(True)
 
-        self.browser.show_status_message(f"Loading materials: {end} of {len(self.all_items)}", "Red")
+        
+        scrollbar.setValue(current_scroll_position)
+
+        self.browser.show_status_message(f"Loading materials: {end} of {len(self.all_items)}", "orange")
 
 
