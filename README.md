@@ -4,6 +4,9 @@ Material Assets Browser for Autodesk 3ds Max 2025+
 Developed by: Iman Shirani
 
 [![Donate ❤️](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate/?hosted_button_id=LAMNRY6DDWDC4)
+![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
+![PyQt6](https://img.shields.io/badge/GUI-PyQt6-green.svg)
+![License](https://img.shields.io/badge/License-MIT-purple.svg)
 
 
 A powerful and flexible material library manager for 3ds Max, supporting multiple render engines and modern material standards like MaterialX. This script is designed to speed up the workflow for 3D artists.
