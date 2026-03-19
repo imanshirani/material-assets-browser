@@ -51,7 +51,7 @@ Management and Efficiency
 
 If you enjoy this tool and want to support future updates, please consider donating:
 
-[![Donate ❤️](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate/?hosted_button_id=LAMNRY6DDWDC4)
+[![Donate ❤️](https://img.shields.io/badge/Donate-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.com/donate/?hosted_button_id=LAMNRY6DDWDC4)
 
 Thanks for your support! 🙏✨
 
