@@ -46,6 +46,17 @@ Management and Efficiency
 2. Launch `launch.py` from the **Scripting > Run Script...** menu.
 3. Set your material root folder from **Settings**.
 
+or
+
+## 📦 Installation
+
+Installing the plugin is quick and requires no manual setup in 3ds Max.
+
+1. **Unzip** the downloaded package.
+2. **Copy** the `.bundle` folder to the Autodesk Application Plugins directory:
+   ```text
+   C:\ProgramData\Autodesk\ApplicationPlugins
+   
 ---
 
 ## ☕ Support Development
