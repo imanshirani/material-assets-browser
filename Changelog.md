@@ -2,6 +2,27 @@
 
 All notable changes to the **Matrial Asset Browser** will be documented in this file.
 
+## [0.0.20] - 2026-04-19
+
+### ✨ New Features
+* **Folder Tree View:** Integrated a hierarchical folder panel on the left for faster navigation, complete with a dedicated toolbar toggle button.
+* **Persistent Caching & Database:** Implemented a `material_db.json` file within the root material folder. This allows for near-instant (In-Memory) searching across thousands of assets and significantly speeds up initial load times.
+* **Intelligent Tagging System:**
+    * Users can now add custom tags to any material via the right-click context menu.
+    * Features a modern **Pill/Chip UI** for tag management with quick-delete (×) functionality and Enter-to-add support.
+* **Hybrid Search Engine:** The search bar now indexes both material names and assigned tags, making asset discovery much more intuitive.
+* **Library Portability:** Since the tag database is stored within the material root, the library remains portable; tags and metadata are preserved when moving the library to different drives or systems.
+
+### 🛠 Improvements & Bug Fixes
+* **Synchronized Rename Logic:** Completely refactored the rename function. Renaming a material now simultaneously updates the physical `.mat` file, the `.jpg` thumbnail, and the database record.
+* 🎨 UI/UX Enhancements:**
+    * **Input Boxes:** Improved color contrast in Dark Mode for better accessibility.
+    * **Tag Chips:** Refined alignment and rounded the edges of delete buttons for a cleaner aesthetic.
+    * **Status Bar:** Fixed the vertical stretching issue when using the `QSplitter`.
+* **Modular Code Architecture:** Separated styles and auxiliary dialogs into dedicated files (`style.py` and `TagManagerDialog.py`), resulting in a cleaner `ui.py` and easier maintenance.
+* **Smart Refresh System:** The **Refresh** button now supports a "Force Rescan" mode to detect manual file changes on the disk without losing existing tag data.
+
+
 ## [0.0.18] - 2026-02-26
 
 ### 🎨 UI/UX Enhancements
