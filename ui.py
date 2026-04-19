@@ -1,9 +1,18 @@
 from logic import *
 import style
-from PySide6.QtWidgets import QGroupBox 
+from PySide6.QtCore import Qt, QSize, QDir
+from PySide6.QtWidgets import QGroupBox, QSplitter, QTreeView, QLabel, QListWidgetItem
 import constants
+from TagManagerDialog import TagManagerDialog
+
+try:
+    from PySide6.QtGui import QFileSystemModel
+except ImportError:
+    from PySide6.QtWidgets import QFileSystemModel
 
 
+
+                    
 # ==========================
 # Main Asset Browser
 # ==========================
@@ -133,8 +142,8 @@ class AssetBrowserWidget(QWidget):
         self.btn_refresh.setToolTip("Refresh")
         self.btn_refresh.setIconSize(QSize(18, 18))
         self.btn_refresh.setFixedSize(32, 32)
-        self.btn_refresh.clicked.connect(lambda: self.load_folder(self.current_path))
-        
+        self.btn_refresh.clicked.connect(lambda: (self.build_cache(force_rescan=True), self.load_folder(self.current_path)))
+
         #Settin Icon
         self.btn_settings = QPushButton()
         settings_icon = QIcon(os.path.join(self.icon_path, "settins.ico"))
@@ -161,7 +170,22 @@ class AssetBrowserWidget(QWidget):
         self.btn_assign.setFixedSize(32, 32)
         self.btn_assign.clicked.connect(self.assign_selected_material)
         
-        
+        # ==========================
+        # Toggle Tree Icon 
+        # ==========================
+        self.btn_toggle_tree = QPushButton()
+        tree_icon = QIcon(os.path.join(self.icon_path, "tree.ico"))
+        if tree_icon.isNull():
+            self.btn_toggle_tree.setText("Tree View")  # If no icon, use text
+        else:
+            self.btn_toggle_tree.setIcon(tree_icon)
+        self.btn_toggle_tree.setToolTip("Toggle Folder Tree")
+        self.btn_toggle_tree.setIconSize(QSize(18, 18))
+        self.btn_toggle_tree.setFixedSize(32, 32)
+        self.btn_toggle_tree.setCheckable(True)
+        self.btn_toggle_tree.setChecked(True)
+        self.btn_toggle_tree.clicked.connect(self.toggle_tree_view)
+
         # Navigation buttons layout
         self.group_tools = QGroupBox("Navigation & Tools")
         self.group_tools.setFixedHeight(60) 
@@ -171,6 +195,7 @@ class AssetBrowserWidget(QWidget):
 
         top_tools_layout = QHBoxLayout()
         top_tools_layout.setSpacing(6)
+        top_tools_layout.addWidget(self.btn_toggle_tree)
         top_tools_layout.addWidget(self.btn_up)
         top_tools_layout.addWidget(self.btn_new_folder)
         top_tools_layout.addWidget(self.btn_refresh)
@@ -230,7 +255,37 @@ class AssetBrowserWidget(QWidget):
         scroll.setWidgetResizable(True)
         scroll.setWidget(self.asset_list)
 
+        # ==========================
+        # Tree View Setup 
+        # ==========================
+        self.file_model = QFileSystemModel()
+        self.file_model.setRootPath(self.root_path)
+        self.file_model.setFilter(QDir.NoDotAndDotDot | QDir.AllDirs) 
+
+        self.tree_view = QTreeView()
+        self.tree_view.setModel(self.file_model)
+        self.tree_view.setRootIndex(self.file_model.index(self.root_path))
+        
+        # hide columns
+        self.tree_view.setColumnHidden(1, True) 
+        self.tree_view.setColumnHidden(2, True) 
+        self.tree_view.setColumnHidden(3, True) 
+        self.tree_view.setHeaderHidden(True)
+        
+        
+        self.tree_view.setStyleSheet(f"background-color: {style.C_BG_PANEL}; color: {style.C_TEXT_MAIN}; border: 1px solid {style.C_BORDER};")
+        self.tree_view.clicked.connect(self.on_tree_clicked)
+
+        
+        self.splitter = QSplitter(Qt.Horizontal)
+        self.splitter.addWidget(self.tree_view)
+        self.splitter.addWidget(scroll)
+        self.splitter.setSizes([200, 600]) 
+        # ==========================
+
+
         self.status_label = QLabel("Ready")
+        self.status_label.setFixedHeight(25)
         self.show_status_message(f"Active Render Engine: {self.active_render_engine.upper()}", "green")
         self.status_label.setStyleSheet("color: gray; font-style: italic; padding: 4px;")
         
@@ -293,14 +348,33 @@ class AssetBrowserWidget(QWidget):
         # --- Main layout ---
         self.main_layout.addWidget(self.path_display)
         self.main_layout.addWidget(self.search_bar)
-        self.main_layout.addWidget(scroll)
+        #self.main_layout.addWidget(scroll)
+        self.main_layout.addWidget(self.splitter, 1)
         self.main_layout.addWidget(self.status_label)
         # --- loaderunit ---
         from loader_utils import BatchLoader
         self.loader = BatchLoader(self, items_per_page=10)
         self.asset_list.verticalScrollBar().valueChanged.connect(self.handle_lazy_scroll)
+        
+        # --- cache search ---
+        self.material_cache = []
+        self.build_cache() 
+
         self.setLayout(self.main_layout)
         self.load_folder(self.current_path)
+# ==========================
+# Tree View Controls
+# ========================== 
+    def toggle_tree_view(self):
+        if self.tree_view.isVisible():
+            self.tree_view.hide()
+        else:
+            self.tree_view.show()
+
+    def on_tree_clicked(self, index):
+        path = self.file_model.filePath(index)
+        if os.path.isdir(path):
+            self.load_folder(path)
 
 # ==========================
 # Detect Render Engine
@@ -333,7 +407,56 @@ class AssetBrowserWidget(QWidget):
             return "other"
         
         
+# ==========================
+# Build Material Cache
+# ========================== 
+    def build_cache(self, force_rescan=False):
+        from logic import load_material_db, save_material_db
+        import os
+        
+        self.show_status_message("Checking material database...", "orange")
+        
+        # check Json if exist
+        if not force_rescan:
+            loaded_db = load_material_db(self.root_path)
+            if loaded_db and len(loaded_db) > 0:
+                self.material_cache = loaded_db
+                self.show_status_message(f"Loaded {len(self.material_cache)} materials from cache.", "green")
+                return
+            
+        self.show_status_message("Scanning folders and building database... Please wait.", "orange")
+        self.material_cache = []
+        
+        try:
+            for root, dirs, files in os.walk(self.root_path):
+                for file in files:
+                    if file.lower().endswith(".mat"):
+                        mat_name = os.path.splitext(file)[0]
+                        mat_path = os.path.join(root, file).replace("\\", "/")
+                        thumbnail_path = os.path.join(root, f"{mat_name}.jpg").replace("\\", "/")
+                        
+                        
+                        existing_tags = []
+                        if force_rescan:
+                            old_db = load_material_db(self.root_path)
+                            if old_db:
+                                old_item = next((i for i in old_db if i["mat_path"] == mat_path and i["name"] == mat_name), None)
+                                if old_item:
+                                    existing_tags = old_item.get("tags", [])
 
+                        self.material_cache.append({
+                            "name": mat_name,
+                            "lower_name": mat_name.lower(),
+                            "mat_path": mat_path,
+                            "thumbnail_path": thumbnail_path,
+                            "tags": existing_tags
+                        })
+            
+            save_material_db(self.root_path, self.material_cache)
+            self.show_status_message(f"Database built and saved: {len(self.material_cache)} materials.", "green")
+            
+        except Exception as e:
+            print(f"[ERROR] Failed to build cache: {e}")
 
 # ==========================
 # Material class allowed
@@ -1363,6 +1486,11 @@ class AssetBrowserWidget(QWidget):
         
         self.loader.setup(self.all_items_to_load)
 
+        
+        tree_index = self.file_model.index(self.current_path)
+        if tree_index.isValid():
+            self.tree_view.setCurrentIndex(tree_index)
+            self.tree_view.scrollTo(tree_index)
     
     def add_folder_item(self, item_path, item_name):
         
@@ -1686,31 +1814,11 @@ class AssetBrowserWidget(QWidget):
                     print(f"[ERROR] Failed to detect class: {e}")
 
                 assign_action = menu.addAction("Assign to Selected Object(s)")
+                manage_tags_action = menu.addAction("Manage Tags...")
                 rename_mat_action = menu.addAction("Rename Material")
-                delete_mat_action = menu.addAction("Delete Material")
-
+                delete_mat_action = menu.addAction("Delete Material")            
                 
                 
-                if action == assign_action:
-                    self.assign_material_to_selection(mat_path, mat_name)
-
-                elif action == rename_mat_action:
-                    self.rename_material(mat_path, mat_name)
-
-                elif action == delete_mat_action:
-                    self.delete_material(mat_path, mat_name)
-
-                elif generate_thumb_action and action == generate_thumb_action:
-                    from PySide6.QtWidgets import QMessageBox
-                    confirm = QMessageBox.question(
-                        self,
-                        "Confirm Thumbnail Generation",
-                        f"Do you want to generate thumbnail for: {mat_name}?",
-                        QMessageBox.Yes | QMessageBox.No
-                    )
-                    if confirm == QMessageBox.Yes:
-                        self.enqueue_thumbnail(mat_path, mat_name)
-
             except Exception as e:
                 print(f"[ERROR] show_context_menu failed: {e}")
           
@@ -1922,6 +2030,18 @@ class AssetBrowserWidget(QWidget):
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to assign material:\n{e}")
         
+        # ====================================================
+        # Manage Tags 
+        # ====================================================
+        elif is_mat and action == manage_tags_action:
+            try:
+                mat_path, mat_name = path.split("::")
+                mat_path = mat_path.replace("\\", "/")
+                self.manage_tags_for_material(mat_path, mat_name)
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to open tags:\n{e}")
+        # ====================================================
+
         #Generation Thumbnil On Rigth Click
         elif is_mat and action and action.text() == "Generate Thumbnail":
             try:
@@ -1948,8 +2068,8 @@ class AssetBrowserWidget(QWidget):
         elif is_mat and action == rename_mat_action:
             try:
                 mat_path, old_name = path.split("::")
+                mat_path = mat_path.replace("\\", "/")
 
-                
                 input_dialog = QInputDialog(self)
                 input_dialog.setStyleSheet(style.MAIN_STYLE)
                 input_dialog.setWindowTitle("Rename Material")
@@ -1958,46 +2078,72 @@ class AssetBrowserWidget(QWidget):
                 input_dialog.setOkButtonText("Apply")
 
                 if input_dialog.exec():
-                    new_name = input_dialog.textValue()
+                    new_name = input_dialog.textValue().strip()
                     if not new_name or new_name == old_name:
                         return
 
                     from pymxs import runtime as rt
 
-                # MaxScript material rename
-                ms_code = f'''
-                try (
-                    local lib = loadTempMaterialLibrary @"{mat_path}"
-                    for i = 1 to lib.count do (
-                        if lib[i].name == "{old_name}" then (
-                            lib[i].name = "{new_name}"
-                            exit
+                    # Rename the material in MaxScript
+                    ms_code = f'''
+                    try (
+                        local lib = loadTempMaterialLibrary @"{mat_path}"
+                        for i = 1 to lib.count do (
+                            if lib[i].name == "{old_name}" then (
+                                lib[i].name = "{new_name}"
+                                exit
+                            )
                         )
+                        saveTempMaterialLibrary lib @"{mat_path}"
+                        true
+                    ) catch (
+                        false
                     )
-                    saveTempMaterialLibrary lib @"{mat_path}"
-                    true
-                ) catch (
-                    false
-                )
-                '''
+                    '''
 
-                result = rt.execute(ms_code)
-                if not result:
-                    raise Exception("Failed to rename material via MaxScript")
+                    result = rt.execute(ms_code)
+                    if not result:
+                        raise Exception("Failed to rename material internally via MaxScript")
 
-                # rename thumbnail (??? ???? ????)
-                thumb_dir = os.path.dirname(mat_path)
-                thumb_found = None
-                for fname in os.listdir(thumb_dir):
-                    if fname.lower().endswith(old_name.lower() + ".jpg"):
-                        thumb_found = os.path.join(thumb_dir, fname)
-                        new_thumb = os.path.join(thumb_dir, fname.replace(old_name, new_name))
-                        os.rename(thumb_found, new_thumb)
-                        print(f"[DEBUG] Renamed thumbnail: {thumb_found} ? {new_thumb}")
-                        break
+                    
+                    mat_dir = os.path.dirname(mat_path)
+                    new_mat_path = os.path.join(mat_dir, f"{new_name}.mat").replace("\\", "/")
+                    
+                    if os.path.exists(mat_path) and mat_path != new_mat_path:
+                       
+                        if os.path.exists(new_mat_path):
+                            os.remove(new_mat_path)
+                        os.rename(mat_path, new_mat_path)
+                        print(f"[DEBUG] Renamed .mat file: {mat_path} -> {new_mat_path}")
 
-                self.load_folder(self.current_path)
-                self.show_status_message(f"Renamed '{old_name}' ? '{new_name}'", "green")
+                    
+                    thumb_found = None
+                    new_thumb = None
+                    for fname in os.listdir(mat_dir):
+                        if fname.lower().endswith(old_name.lower() + ".jpg"):
+                            thumb_found = os.path.join(mat_dir, fname).replace("\\", "/")
+                            new_thumb = os.path.join(mat_dir, fname.replace(old_name, new_name)).replace("\\", "/")
+                            if os.path.exists(new_thumb):
+                                os.remove(new_thumb)
+                            os.rename(thumb_found, new_thumb)
+                            print(f"[DEBUG] Renamed thumbnail: {thumb_found} -> {new_thumb}")
+                            break
+
+                    
+                    for item in self.material_cache:
+                        if item["mat_path"] == mat_path and item["name"] == old_name:
+                            item["name"] = new_name
+                            item["lower_name"] = new_name.lower()
+                            item["mat_path"] = new_mat_path  
+                            if new_thumb:
+                                item["thumbnail_path"] = new_thumb
+                            break
+                    
+                    from logic import save_material_db
+                    save_material_db(self.root_path, self.material_cache)
+
+                    self.load_folder(self.current_path)
+                    self.show_status_message(f"Renamed '{old_name}' -> '{new_name}'", "green")
 
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to rename material:\n{e}")
@@ -2109,7 +2255,7 @@ class AssetBrowserWidget(QWidget):
     
 
 # ==========================
-# Filter Items
+# Filter Items (Cached Version + Tags)
 # ==========================
     def filter_items(self, query):
         query = query.strip().lower()
@@ -2122,30 +2268,65 @@ class AssetBrowserWidget(QWidget):
         engine = self.active_render_engine
         allowed_classes = [c.lower() for c in self.allowed_classes.get(engine, [])]
 
-        for root, dirs, files in os.walk(self.root_path):
-            for file in files:
-                if file.lower().endswith(".mat"):
-                    mat_name = os.path.splitext(file)[0]
-                    if query in mat_name.lower():
-                        mat_path = os.path.join(root, file).replace("\\", "/")
-                        thumbnail_path = os.path.join(root, f"{mat_name}.jpg").replace("\\", "/")
+        for item in self.material_cache:
+            
+            tags_string = " ".join(item.get("tags", []))
+            searchable_text = f'{item["lower_name"]} {tags_string}'
+            
+            # search
+            if query in searchable_text:
+                
+                mat_name = item["name"]
+                mat_path = item["mat_path"]
+                thumbnail_path = item["thumbnail_path"]
 
-                        # Filter items
-                        if any(self.asset_list.item(i).text() == mat_name for i in range(self.asset_list.count())):
-                            continue
+                mat_class = self.material_class_cache.get(mat_path.lower(), "unknown")
+                if mat_class.lower() != "unknown" and mat_class.lower() not in allowed_classes:
+                    continue
 
-                        mat_class = self.material_class_cache.get(mat_path.lower(), "unknown")
-                        if mat_class.lower() != "unknown" and mat_class.lower() not in allowed_classes:
-                            continue
+                from PySide6.QtGui import QIcon
+                from PySide6.QtWidgets import QListWidgetItem
+                from PySide6.QtCore import Qt
+                import os
 
-                        icon = QIcon(thumbnail_path) if os.path.exists(thumbnail_path) else QIcon()
-                        item = QListWidgetItem(icon, mat_name)
-                        item.setData(Qt.UserRole, f"{mat_path}::{mat_name}")
-                        self.asset_list.addItem(item)
+                icon = QIcon(thumbnail_path) if os.path.exists(thumbnail_path) else QIcon()
+                
+                
+                display_name = mat_name
+                if item.get("tags"):
+                    display_name += f"\n[{', '.join(item['tags'])}]"
+
+                list_item = QListWidgetItem(icon, display_name)
+                list_item.setData(Qt.UserRole, f"{mat_path}::{mat_name}")
+                self.asset_list.addItem(list_item)
 
 
 
+# ==========================
+# Manage Tags Logic
+# ==========================
+    def manage_tags_for_material(self, mat_path, mat_name):
+        mat_item = next((item for item in self.material_cache if item["mat_path"] == mat_path and item["name"] == mat_name), None)
+        
+        if not mat_item:
+            self.show_status_message("Material not found in database. Try refreshing.", "red")
+            return
 
+        current_tags = mat_item.get("tags", [])
+        
+        
+        dialog = TagManagerDialog(self, current_tags)
+        if dialog.exec():
+            new_tags = dialog.get_tags()
+            mat_item["tags"] = new_tags 
+            
+            from logic import save_material_db
+            if save_material_db(self.root_path, self.material_cache):
+                self.show_status_message(f"Tags updated for '{mat_name}'", "green")
+                
+                current_query = self.search_bar.text()
+                if current_query:
+                    self.filter_items(current_query)
 
 # ==========================
 # Filter Items get_mat_class
@@ -2197,5 +2378,10 @@ class AssetBrowserWidget(QWidget):
                 from logic import save_config
                 save_config(self.config)
                 
-                self.root_path = new_path
+                self.root_path = new_path                
+                self.build_cache() 
+                self.file_model.setRootPath(self.root_path)
+                self.tree_view.setRootIndex(self.file_model.index(self.root_path))
+                # ---------------------------------------------
+
                 self.load_folder(self.root_path)

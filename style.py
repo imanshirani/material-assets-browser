@@ -110,6 +110,67 @@ QPushButton#HeaderSettingsBtn {{
 """
 
 # ==========================
+# --- TAG MANAGER STYLES ---
+# ==========================
+
+# TAGLIST STYLES
+TAG_LIST_STYLE = f"""
+QListWidget {{   
+    
+    margin: 0px 0px 0px 0px; /
+    padding: 0px;
+    
+}}
+"""
+
+# CAPSULE STYLES
+TAG_CHIP_STYLE = f"""
+QWidget {{
+    background-color: {C_BTN_BG};
+    border: 1px solid {C_BTN_BORDER};
+    border-radius: 5px;
+}}
+QLabel {{
+    color: {C_TEXT_MAIN};
+    font-weight: bold;
+    background-color: transparent;
+    border: none;
+    padding-left: 5px;  /* space from left to label */
+    padding-right: 2px; /* space between label and close button */
+}}
+QPushButton {{
+    background-color: transparent;
+    color: {C_TEXT_DIM};
+    font-weight: bold;
+    font-size: 10px;
+    border: none;
+    border-radius: 5px; /* radius of close button */
+    margin-right: 2px;
+}}
+QPushButton:hover {{
+    background-color: #ff4444; 
+    color: {C_WHITE};
+}}
+"""
+
+
+TAG_INPUT_STYLE = f"""
+QLineEdit {{
+    background-color: #151515; 
+    border: 1px solid {C_BORDER};
+    border-radius: 4px;
+    padding: 8px;
+    color: {C_TEXT_MAIN};
+}}
+QLineEdit:focus {{
+    border: 1px solid {C_ACCENT};
+    background-color: #1a1a1a;
+}}
+"""
+
+
+
+# ==========================
 # --- HTML TEMPLATES ---
 # ==========================
 HTML_CARD_STYLE = f"""

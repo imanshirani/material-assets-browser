@@ -110,6 +110,34 @@ def save_config(config):
         return False
 
 # ==========================
+# Material Database Load & Save 
+# ==========================
+def load_material_db(root_path):
+    import json
+    import os
+    db_path = os.path.join(root_path, "material_db.json").replace("\\", "/")
+    if os.path.exists(db_path):
+        try:
+            with open(db_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"[ERROR] Could not load material DB: {e}")
+    return [] 
+
+def save_material_db(root_path, db_data):
+    import json
+    import os
+    db_path = os.path.join(root_path, "material_db.json").replace("\\", "/")
+    try:
+        with open(db_path, 'w', encoding='utf-8') as f:
+            json.dump(db_data, f, indent=4, ensure_ascii=False)
+        print(f"[SUCCESS] Material DB saved to: {db_path}")
+        return True
+    except Exception as e:
+        print(f"[ERROR] Could not save material DB: {e}")
+        return False
+    
+# ==========================
 # ThumbnailProgressDialog 
 # ==========================
 class ThumbnailProgressDialog(QDialog):

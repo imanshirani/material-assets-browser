@@ -13,7 +13,7 @@ if script_dir in sys.path:
 sys.path.insert(0, script_dir)
 
 
-modules_to_clear = ["style", "logic", "ui", "loader_utils", "constants"]
+modules_to_clear = ["style", "logic", "ui", "loader_utils", "constants", "settings_dialog", "TagManagerDialog"] 
 for mod in modules_to_clear:
     if mod in sys.modules:
         del sys.modules[mod]
@@ -25,6 +25,7 @@ try:
     import loader_utils
     import ui
     import settings_dialog
+    import TagManagerDialog
     
     #load modules
     importlib.reload(constants)
@@ -33,6 +34,7 @@ try:
     importlib.reload(loader_utils)
     importlib.reload(ui)
     importlib.reload(settings_dialog)
+    importlib.reload(TagManagerDialog)
     
     from ui import AssetBrowserWidget
     print(f"[SUCCESS] Modules loaded correctly from: {script_dir}")

@@ -4,7 +4,7 @@ import os
 PRODUCT_NAME = "Material Assets Browser"
 WINDOW_TITLE = "Material Assets Browser"
 DOCK_OBJECT_NAME = "MaterialAssetsBrowserDock"
-VERSION = "0.0.19 Beta"
+VERSION = "0.0.20 Beta"
 AUTHOR = "Iman Shirani"
 DEVELOPER_TAG = "Developed by IMAN SHIRANI"
 
