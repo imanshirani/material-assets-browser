@@ -1525,6 +1525,8 @@ class AssetBrowserWidget(QWidget):
     def add_material_item(self, mat_path):
         try:
             from pymxs import runtime as rt
+            import os
+
             lib = rt.loadTempMaterialLibrary(mat_path)
             if not lib or lib.count == 0: return
 
@@ -1536,14 +1538,26 @@ class AssetBrowserWidget(QWidget):
             entry.setSizeHint(QSize(160, 240))
             entry.setData(Qt.UserRole, f"{mat_path}::{mat_name}")
             
-           
-            icon_file = thumb_path if os.path.exists(thumb_path) else os.path.join(self.icon_path, "matcap.ico")
+            # Check if thumbnail exists
+            if os.path.exists(thumb_path):
+                icon_file = thumb_path
+            else:
+                icon_file = os.path.join(self.icon_path, "matcap.ico")
+                
+                # --- AUTO-GENERATE TRIGGER ---
+                # Ensure it's not already in the queue to avoid duplicate renders
+                is_in_queue = any(q_path == mat_path for q_path, q_name in self.thumbnail_queue)
+                if not is_in_queue:
+                    self.enqueue_thumbnail(mat_path, mat_name)
+                # -----------------------------
+
             entry.setIcon(QIcon(icon_file))
 
             card_html = style.HTML_CARD_STYLE.format(name=mat_name.upper())
             label = QLabel(card_html)
             label.setAlignment(Qt.AlignCenter)
             self.asset_list.setItemWidget(entry, label)
+            
         except Exception as e:
             print(f"[ERROR] Failed to add item: {e}")
 
@@ -1759,7 +1773,7 @@ class AssetBrowserWidget(QWidget):
             set_icon_action = menu.addAction("Set Icon")
             # Check for PBR folder
             if self.is_pbr_folder(path):
-                make_pbr_action = menu.addAction("Make PBR Material (Octane)")
+                make_pbr_action = menu.addAction("Make PBR Material")
             
                 
                 
@@ -1840,24 +1854,52 @@ class AssetBrowserWidget(QWidget):
                 files = {f.lower(): f for f in os.listdir(path)}
 
                 def find_map(keywords):
-                    for name in files:
+                    
+                    valid_files = [f for f in files if f.lower().endswith(('.jpg', '.png', '.jpeg', '.tif', '.exr'))]
+                    
+                    
+                    for name in valid_files:
                         lower_name = name.lower()
-                        if any(lower_name.endswith(k + ext) for k in keywords for ext in [".jpg", ".png", ".jpeg", ".tif", ".exr"]):
-                            return os.path.join(path, files[name])
+                        name_no_ext = os.path.splitext(lower_name)[0]
+                        
+                        
+                        for res in ['_8k', '-8k', '_4k', '-4k', '_2k', '-2k', '_1k', '-1k']:
+                            if name_no_ext.endswith(res):
+                                name_no_ext = name_no_ext[:-len(res)]
+                                
+                        for k in keywords:
+                            
+                            if name_no_ext.endswith(k):
+                                return os.path.join(path, files[name])
+                                
+                    
+                    for name in valid_files:
+                        lower_name = name.lower()
+                        name_no_ext = os.path.splitext(lower_name)[0]
+                        for k in keywords:
+                            if f"_{k}" in name_no_ext or f"-{k}" in name_no_ext or f"{k}_" in name_no_ext:
+                                return os.path.join(path, files[name])
+                                
+                    
+                    for name in valid_files:
+                        lower_name = name.lower()
+                        for k in keywords:
+                            if k in lower_name:
+                                return os.path.join(path, files[name])
+                                
                     return None
 
-                # ?? Find all supported maps
-                map_albedo   = find_map(["albedo", "basecolor", "diffuse"])
-                map_rough    = find_map(["roughness"])
-                map_norm     = find_map(["normal", "nor"])
-                map_metal    = find_map(["metal", "metallic"])
-                map_opacity  = find_map(["opacity", "transparency"])
-                map_displace = find_map(["displace", "displacement", "height"])
-                map_ao       = find_map(["ao", "ambientocclusion"])
+                # Find all supported maps
+                map_albedo   = find_map(["albedo", "basecolor", "diffuse", "color"])
+                map_rough    = find_map(["roughness", "rough"])
+                map_norm     = find_map(["normal", "nor", "nrm"])
+                map_metal    = find_map(["metalness", "metallic", "metal"]) # metalness اضافه شد
+                map_opacity  = find_map(["opacity", "transparency", "alpha"])
+                map_displace = find_map(["displace", "displacement", "height", "disp"])
                 map_emission = find_map(["emission", "emit", "glow"])
-                map_gloss    = find_map(["gloss", "glossiness", "specular"])
 
                 if not map_albedo:
+                    from PySide6.QtWidgets import QMessageBox
                     QMessageBox.warning(self, "Missing Map", "No Albedo/BaseColor found in folder.")
                     return
 
@@ -1870,73 +1912,54 @@ class AssetBrowserWidget(QWidget):
                 map_metal    = norm_path(map_metal)
                 map_opacity  = norm_path(map_opacity)
                 map_displace = norm_path(map_displace)
-                map_ao       = norm_path(map_ao)
                 map_emission = norm_path(map_emission)
-                map_gloss    = norm_path(map_gloss)
-                lib_dir = os.path.join(self.root_path, "PBR")  
-                os.makedirs(lib_dir, exist_ok=True)
-                lib_path = os.path.join(lib_dir, f"{folder_name}.mat").replace("\\", "/")
 
+                lib_path = os.path.join(path, f"{folder_name}.mat").replace("\\", "/")
 
-                
-                def tex_block(tex_path, slot_name):
-                    """
-                    tex_path: (string)
-                    slot_name:  ("baseColor_tex")
-                    """
+                def tex_block(tex_path, slot_name, is_normal=False, extra_props=None):
                     if not tex_path:
-                        return ""
-                    # 
-                    if slot_name == "displacement_tex":
-                        return f'''
-                        if doesFileExist "{tex_path}" do (
-                            
-                            dispNode = Texture_displacement()
-                            
-                            dispTex = RGB_image name:"{folder_name}_displacement.png"
-                            dispTex.filename = "{tex_path}"
-                            dispTex.filename_bitmaptex = bitmaptexture filename:dispTex.filename
-                            
-                            dispNode.texture_tex = dispTex
-                            
-                            mtl.displacement = dispNode
-                        )'''
-                    # 
-                    var_name   = slot_name.replace("_tex", "Tex")                  # "baseColor_tex" -> "baseColorTex"
-                    input_prop = slot_name.replace("_tex", "") + "_input_type"     # "baseColor_input_type"
-                    return f'''
-                    if doesFileExist "{tex_path}" do (
-                        {var_name} = RGB_image()
-                        {var_name}.filename = "{tex_path}"
-                        {var_name}.filename_bitmaptex = bitmaptexture filename:{var_name}.filename
-                        mtl.{input_prop} = 2
-                        mtl.{slot_name} = {var_name}
-                    )'''
-                    
-    
+                        return ""                
 
-                # Assign all map slots if found
+                    # Using standard Bitmaptexture for Universal Engine Compatibility
+                    lines = [f'if doesFileExist "{tex_path}" do (']
+                    
+                    if is_normal:
+                        lines.append(f'    local bmpTex = Bitmaptexture filename:"{tex_path}"')
+                        lines.append(f'    local normNode = Normal_Bump()')
+                        lines.append(f'    normNode.normal_map = bmpTex')
+                        lines.append(f'    mtl.{slot_name} = normNode')
+                    else:
+                        lines.append(f'    mtl.{slot_name} = Bitmaptexture filename:"{tex_path}"')
+
+                    # Enable the map slot
+                    lines.append(f'    mtl.{slot_name}_on = true')
+
+                    # Inject any extra properties (like base_weight, emission_weight)
+                    if extra_props:
+                        for prop, val in extra_props.items():
+                            lines.append(f'    mtl.{prop} = {val}')
+
+                    lines.append(')')
+                    return "\n                    ".join(lines)
+
+                # Assign OpenPBR slots based on the material dump
                 tex_blocks = [
-                    tex_block(map_albedo,   "baseColor_tex"),
-                    tex_block(map_rough,    "roughness_tex"),
-                    tex_block(map_metal,    "metallic_tex"),
-                    tex_block(map_norm,     "normal_tex"),
-                    tex_block(map_opacity,  "opacity_tex"),
-                    tex_block(map_displace, "displacement_tex"),  # Add Displacement
-                    # tex_block(map_ao,       "ambient_occlusion_tex"),
-                    tex_block(map_emission, "emission_tex"),
-                    tex_block(map_gloss,    "specularLevel_tex")
+                    tex_block(map_albedo,   "base_color_map", extra_props={"base_weight": "1.0"}),
+                    tex_block(map_rough,    "specular_roughness_map"),
+                    tex_block(map_metal,    "base_metalness_map"),
+                    tex_block(map_norm,     "geometry_normal_map", is_normal=True),
+                    tex_block(map_opacity,  "geometry_opacity_map", extra_props={"geometry_thin_walled": "true"}),
+                    tex_block(map_displace, "displacement_map"),
+                    tex_block(map_emission, "emission_color_map", extra_props={"emission_weight": "1.0"})
                 ]
 
                 tex_code = "\n".join(tex_blocks)
-                lib_path = os.path.join(path, f"{folder_name}.mat").replace("\\", "/")
                 
                 ms_code = f'''
                 try (
-                    local mtl = Std_Surface_Mtl name:"{folder_name}"
+                    local mtl = OpenPBR_Material name:"{folder_name}"
 
-                    -- here we inject the actual MXS lines,
-                    -- not the Python list object!
+                    -- Inject map assignments
                     {tex_code}
 
                     -- Next Slot Material Editor
@@ -1947,7 +1970,7 @@ class AssetBrowserWidget(QWidget):
                             exit
                         )
                     )
-                    meditMaterials[slot_index] = mtl
+                    if slot_index <= meditMaterials.count do meditMaterials[slot_index] = mtl
 
                     -- Save to new dedicated .mat file
                     local lib = MaterialLibrary()
@@ -1955,23 +1978,22 @@ class AssetBrowserWidget(QWidget):
                     saveTempMaterialLibrary lib "{lib_path}"
                     "OK"
                 ) catch (
-                    format "Failed to create Std_Surface_Mtl.\\n"
+                    format "Failed to create OpenPBR_Material: %\\n" (getCurrentException())
                     "ERROR"
                 )
                 '''
 
-                print("[DEBUG] MaxScript for Octane Std_Surface_Mtl:\n", ms_code)
+                print("[DEBUG] MaxScript for OpenPBR_Material:\n", ms_code)
                 result = rt.execute(ms_code)
 
-
                 if result != "OK":
-                    raise Exception("MaxScript failed to create Octane Std_Surface_Mtl.")
+                    raise Exception("MaxScript failed to create OpenPBR_Material.")
 
-                self.show_status_message(f"Created Octane Std_Surface_Mtl: '{folder_name}'", "green")
+                self.show_status_message(f"Created OpenPBR Material: '{folder_name}'", "green")
 
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to create Octane Std_Surface_Mtl:\n{e}")
-        
+                from PySide6.QtWidgets import QMessageBox
+                QMessageBox.critical(self, "Error", f"Failed to create OpenPBR Material:\n{e}")
         
         
         # IF FOLDER
