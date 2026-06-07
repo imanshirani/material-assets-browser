@@ -2,6 +2,23 @@
 
 All notable changes to the **Matrial Asset Browser** will be documented in this file.
 
+## [0.0.21] - 2026-06-07
+
+### ✨ New Features
+* Automated Background Thumbnail Queuing: Integrated an intelligent lazy-loading thumbnail generation system. When navigating into a directory, the browser automatically scans for assets missing thumbnails and queues them for background rendering without blocking or freezing the 3ds Max main thread UI.
+
+* Universal OpenPBR Material Generation: Refactored the automated PBR texture import pipeline to generate standardized OpenPBR_Material nodes instead of legacy engine-specific wrappers (Std_Surface_Mtl). Materials created through the pipeline are now natively portable across all major production renderers (V-Ray, Arnold, Corona, Redshift, and Octane).
+
+* Multi-Select Batch Rendering: Enhanced the asset list context menu to support multi-selection. Users can now select multiple material assets simultaneously and trigger the "Generate Thumbnail" command to batch-populate the background render queue.
+
+### 🛠 Improvements & Bug Fixes
+* Robust Path Normalization: Hardened the material loading subsystem in ui.py using os.path.normpath and unified slash handling. This prevents Python exceptions and silent crashes when parsing inconsistent Windows backslashes (\) or missing file indicators.
+
+* Smarter PBR Texture Identification: Rewrote the mapping algorithm (find_map) to utilize a robust 3-stage heuristic priority chain. The updated engine successfully ignores resolution strings (e.g., _4k, -8k) and eliminates token conflicts—such as mistakenly identifying an Albedo map as a Metalness map when the base asset string contains overlapping keyword criteria.
+
+* Synchronized Library Paths: Fixed a critical path-saving bug in the PBR generation module. Generated .mat material libraries are now written directly to the active texture source directory rather than falling back to the global material root.
+
+
 ## [0.0.20] - 2026-04-19
 
 ### ✨ New Features
