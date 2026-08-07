@@ -8,6 +8,7 @@ Developed by: Iman Shirani
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)
 ![PyQt6](https://img.shields.io/badge/GUI-PyQt6-41CD52?style=flat-square&logo=qt&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-purple?style=flat-square)
+![Version](https://img.shields.io/badge/version-0.0.21-orange)
 
 
 A powerful and flexible material library manager for 3ds Max, supporting multiple render engines and modern material standards like MaterialX. This script is designed to speed up the workflow for 3D artists.
