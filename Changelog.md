@@ -1,6 +1,34 @@
 # Changelog
 
-All notable changes to the **Matrial Asset Browser** will be documented in this file.
+All notable changes to the **Material Asset Browser** will be documented in this file.
+
+## [0.0.22] - 2026-08-13 🚀 Release
+
+### ✨ New Features
+* **Drag & Drop to Viewport:** Materials can now be dragged directly from the browser and dropped onto any mesh object in the 3ds Max viewport to instantly assign them. A floating label follows the cursor during drag, showing the material name. The cursor changes to a forbidden icon when hovering outside a valid viewport, and pressing Escape cancels the operation.
+
+### 🛠 Bug Fixes
+* **Crash Fix — `SettingsDialog`:** Removed a duplicate `SettingsDialog` class in `logic.py` that defined a `create_about_tab()` call without implementing the method, causing an immediate crash on open.
+* **Crash Fix — `QColor` missing import:** `add_folder_item` was calling `QColor` without importing it, crashing whenever a folder had no icon file.
+* **Crash Fix — `shutil` missing import:** `move_material_to_folder` was using `shutil.move` without importing `shutil`.
+* **Crash Fix — `original_renderer` in `finally`:** In `generate_thumbnail`, if `pymxs` failed to import, the `finally` block would raise a `NameError` on `original_renderer`. Variable is now initialized to `None` before the `try` block.
+* **AttributeError — `self.context_menu`:** Used in `move_material_to_folder` before ever being assigned. Added initialization in `__init__`.
+* **Layout Bug — `search_bar` added twice:** `search_bar` was added to both `tools_layout` and `main_layout`. Qt silently moves the widget to the second layout, leaving `group_tools` missing it. Fixed by keeping only the `main_layout` placement.
+* **Silent error swallow in `load_config`:** Bare `except: pass` was hiding all config-load failures. Changed to `except Exception as e` with a logged message.
+* **CSS syntax error in `style.py`:** `TAG_LIST_STYLE` had a trailing `/` after a CSS property, breaking the stylesheet silently.
+* **Duplicate imports in `logic.py`:** `QLabel` and `QVBoxLayout` were listed twice in the same `from PySide6.QtWidgets import` block.
+* **Redundant `CONFIG_PATH` assignment:** An intermediate assignment to `CONFIG_PATH` in `logic.py` was immediately overwritten on the next line — removed.
+* **Redundant `setDragEnabled(False)`** called twice in sequence on `asset_list` — duplicate removed.
+
+### 🧹 Code Cleanup
+* Removed dead functions `find_3dsmaxcmd` and `find_octane_max` from `logic.py` (defined but never called).
+* Removed dead `write_maxscript` method from `ui.py` (was replaced by in-process rendering in an earlier version).
+* Removed unused imports from `logic.py`: `uuid`, `tempfile`, `subprocess`, `inspect`, `platform`, `deque`, `Counter`, `import style`.
+* Removed redundant `importlib.reload()` calls in `MaterialAssetsBrowser.py` — deleting a module from `sys.modules` and then importing it is already a fresh load; reloading again immediately after was a no-op.
+* Simplified `is_mat` detection in `show_context_menu` from a complex `endswith` chain to a readable `split("::")[0].endswith(".mat")`.
+* Removed unused `self.asset_list.selectedItems()` call (result was discarded).
+
+---
 
 ## [0.0.21] - 2026-06-07
 
