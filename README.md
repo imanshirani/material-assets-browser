@@ -1,4 +1,4 @@
-# Material Assets Browser (Open Beta) 🚀
+# Material Assets Browser  🚀
 Material Assets Browser for Autodesk 3ds Max 2025+
 
 Developed by: Iman Shirani
