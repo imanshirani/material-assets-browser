@@ -4,24 +4,15 @@
 import os
 import getpass
 import json
-import uuid
-import tempfile
-import subprocess
-import inspect  
-import platform
-from collections import deque, Counter
-from settings_dialog import SettingsDialog
 
 from PySide6.QtWidgets import (
     QApplication, QWidget, QLabel, QVBoxLayout, QListWidget, QProgressBar, QAbstractItemView,
     QPushButton, QFileDialog, QHBoxLayout, QMessageBox, QInputDialog,
     QListWidgetItem, QMenu, QDialog, QFormLayout, QScrollArea, QTabWidget,
-    QSizePolicy, QSplitter, QLineEdit, QDockWidget, QStatusBar, QLabel, QVBoxLayout
+    QSizePolicy, QSplitter, QLineEdit, QDockWidget, QStatusBar
 )
 from PySide6.QtGui import QIcon, QPixmap, QDesktopServices
 from PySide6.QtCore import QSize, Qt, QTimer, QUrl
-
-import style
 
 # ==========================
 # Runing Inside 3Dsmax
@@ -33,50 +24,10 @@ def running_inside_3dsmax():
     except ImportError:
         return False
 
-# ==========================
-# Find 3ds Max CMD
-# ==========================
-def find_3dsmaxcmd():
-    # Version Of 3ds max
-    preferred_versions = ["2025", "2026", "2027"]
 
-    for version in preferred_versions:
-        exe_path = fr"C:\Program Files\Autodesk\3ds Max {version}\3dsmaxcmd.exe"
-        if os.path.exists(exe_path):
-            print(f"[FOUND] 3dsmaxcmd: {exe_path}")
-            return exe_path
-
-    print("[NOT FOUND] No suitable 3dsmaxcmd version found.")
-    return None
-# ==========================
-# Find Ocaten 
-# ==========================
-def find_octane_max():
-    import os
-
-    base_path = r"C:\Program Files\Autodesk"
-    versions = ["2025", "2026", "2027"]  # ADD More Version
-
-    for version in versions:
-        max_dir = f"3ds Max {version}"
-        max_path = os.path.join(base_path, max_dir)
-        plugin_path = os.path.join(max_path, "plugins", "Octane3dsmax.dlr")
-        exe_path = os.path.join(max_path, "3dsmaxcmd.exe")
-        exe_path = exe_path.replace("\\", "/")
-
-        print(f"[DEBUG] Checking Max {version} ? {exe_path}")
-        
-        if os.path.isfile(plugin_path) and os.path.isfile(exe_path):
-            print(f"[FOUND] Octane-enabled Max: {exe_path}")
-            return exe_path
-
-    print("[NOT FOUND] No Octane-enabled Max found.")
-    return None
-    
 # ==========================
 # Config Path Load & save 
 # ==========================
-CONFIG_PATH = os.path.join(os.path.expanduser("~"), "Material_asset_config.json")
 DEFAULT_MATERIAL_ROOT = "C:/Materials/"
 current_user = getpass.getuser()
 CONFIG_PATH = os.path.join("C:/Users", current_user, "Material_asset_config.json").replace("\\", "/")
@@ -86,11 +37,9 @@ def load_config():
         try:
             with open(CONFIG_PATH, 'r') as f:
                 return json.load(f)
-        except:
-            pass
-    
-    
-    
+        except Exception as e:
+            print(f"[ERROR] Failed to load config: {e}")
+
     fallback_path = os.path.dirname(os.path.abspath(__file__)).replace("\\", "/")
     return {"material_root": fallback_path}
 
@@ -161,42 +110,4 @@ class ThumbnailProgressDialog(QDialog):
         layout.addWidget(label)
         layout.addWidget(self.progress)
         self.setLayout(layout)
-# ==========================
-# Setting Dialog
-# ==========================
-class SettingsDialog(QDialog):
-    def __init__(self, parent, config):
-        super().__init__(parent)
-        self.setStyleSheet(style.MAIN_STYLE)
-        self.setWindowTitle("Settings")
-        self.setMinimumWidth(400)
-        self.config = config
-
-        # ======== QTabWidget ========
-        main_layout = QVBoxLayout(self)
-        self.tabs = QTabWidget()
-        main_layout.addWidget(self.tabs)
-
-        self.tabs.addTab(self.create_general_tab(), "General")
-        self.tabs.addTab(self.create_about_tab(), "About")
-
-    def create_general_tab(self):
-        widget = QWidget()
-        layout = QFormLayout(widget)
-
-        self.change_material_btn = QPushButton("Change Material Root Folder")
-        self.change_material_btn.clicked.connect(self.change_material_path)
-        layout.addRow(self.change_material_btn)
-
-        return widget
-
-    
-
-    def change_material_path(self):
-        dir_path = QFileDialog.getExistingDirectory(self, "Select Material Root Folder")
-        if dir_path:
-            self.config["material_root"] = dir_path
-            save_config(self.config)
-            QMessageBox.information(self, "Saved", "Material path updated. Please restart the application.")
-            self.accept()
 

@@ -1,6 +1,5 @@
 import os
 import sys
-import importlib
 from PySide6.QtWidgets import QDockWidget, QApplication
 from PySide6.QtCore import Qt
 
@@ -13,7 +12,7 @@ if script_dir in sys.path:
 sys.path.insert(0, script_dir)
 
 
-modules_to_clear = ["style", "logic", "ui", "loader_utils", "constants", "settings_dialog", "TagManagerDialog"] 
+modules_to_clear = ["style", "logic", "ui", "loader_utils", "constants", "settings_dialog", "TagManagerDialog"]
 for mod in modules_to_clear:
     if mod in sys.modules:
         del sys.modules[mod]
@@ -26,20 +25,9 @@ try:
     import ui
     import settings_dialog
     import TagManagerDialog
-    
-    #load modules
-    importlib.reload(constants)
-    importlib.reload(style)
-    importlib.reload(logic)
-    importlib.reload(loader_utils)
-    importlib.reload(ui)
-    importlib.reload(settings_dialog)
-    importlib.reload(TagManagerDialog)
-    
     from ui import AssetBrowserWidget
     print(f"[SUCCESS] Modules loaded correctly from: {script_dir}")
 except Exception as e:
-    #"No module named browser_item"
     print(f"[CRITICAL ERROR] Failed to load modules: {e}")
 
 def show_in_max():

@@ -1,6 +1,10 @@
 from logic import *
+import shutil
+import ctypes
+from ctypes import wintypes
 import style
 from PySide6.QtCore import Qt, QSize, QDir
+from PySide6.QtGui import QColor, QCursor
 from PySide6.QtWidgets import QGroupBox, QSplitter, QTreeView, QLabel, QListWidgetItem
 import constants
 from TagManagerDialog import TagManagerDialog
@@ -12,7 +16,257 @@ except ImportError:
 
 
 
-                    
+# ==========================
+# Drag & Drop — Win32 helpers (physical pixels, DPI-safe)
+# ==========================
+def _phys_cursor_pos():
+    """Win32 physical cursor position — not affected by DPI scaling."""
+    pt = wintypes.POINT()
+    ctypes.windll.user32.GetCursorPos(ctypes.byref(pt))
+    return pt.x, pt.y
+
+def _hwnd_at(phys_x, phys_y):
+    return ctypes.windll.user32.WindowFromPoint(wintypes.POINT(phys_x, phys_y))
+
+def _is_max_viewport(hwnd):
+    """True if hwnd is anywhere inside the 3ds Max main window."""
+    try:
+        from qtmax import GetQMaxMainWindow
+        max_hwnd = int(GetQMaxMainWindow().winId())
+        check = hwnd
+        for _ in range(25):
+            if check == max_hwnd:
+                return True
+            parent = ctypes.windll.user32.GetParent(check)
+            if not parent:
+                break
+            check = parent
+        return False
+    except Exception:
+        buf = ctypes.create_unicode_buffer(256)
+        ctypes.windll.user32.GetClassNameW(hwnd, buf, 256)
+        return any(k in buf.value for k in ["ViewExWnd", "AfxFrameOrView"])
+
+def _screen_to_local(hwnd, phys_x, phys_y):
+    """Physical screen coords → client-area coords of hwnd (DPI-safe via ScreenToClient)."""
+    pt = wintypes.POINT(phys_x, phys_y)
+    ctypes.windll.user32.ScreenToClient(hwnd, ctypes.byref(pt))
+    return pt.x, pt.y
+
+def _logical_cursor_pos():
+    """Qt logical cursor position — used only for overlay positioning."""
+    p = QCursor.pos()
+    return p.x(), p.y()
+
+
+# ==========================
+# Drag Overlay
+# ==========================
+class DragOverlay(QLabel):
+    """Floating label that follows cursor during a material drag."""
+    def __init__(self, text, parent=None):
+        super().__init__(parent)
+        self.setWindowFlags(Qt.ToolTip | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setText(f"  {text}  ")
+        self.setStyleSheet(
+            "QLabel {"
+            "  background-color: rgba(0, 178, 255, 210);"
+            "  color: white;"
+            "  font-weight: bold;"
+            "  font-size: 11px;"
+            "  padding: 6px 12px;"
+            "  border-radius: 6px;"
+            "}"
+        )
+        self.adjustSize()
+
+
+# ==========================
+# Draggable Material List
+# ==========================
+class DraggableMaterialList(QListWidget):
+    """
+    QListWidget with drag-to-viewport support.
+
+    Uses QTimer polling + Win32 GetAsyncKeyState instead of grabMouse(),
+    so it never blocks 3ds Max's own event loop.
+
+    Coordinate strategy
+    -------------------
+    - Win32 APIs (WindowFromPoint, GetWindowRect, GetCursorPos)
+      all work in PHYSICAL pixels — DPI-transparent.
+    - Qt overlay uses QCursor.pos() (logical) so Qt handles scaling itself.
+    - mapScreenToWorldRay receives physical viewport-local pixels,
+      which is what 3ds Max expects.
+    """
+
+    DRAG_THRESHOLD = 8   # logical px before drag starts
+    POLL_MS        = 16  # timer interval during drag (~60 fps)
+    VK_LBUTTON     = 0x01
+
+    def __init__(self, browser, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.browser        = browser
+        self._drag_item     = None
+        self._drag_start    = None   # QPoint, logical
+        self._dragging      = False
+        self._cursor_set    = False
+        self._overlay       = None
+        self._poll          = QTimer(self)
+        self._poll.timeout.connect(self._tick)
+
+    # --- Qt mouse events — only used to START the drag ---
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            item = self.itemAt(event.pos())
+            if item and "::" in str(item.data(Qt.UserRole) or ""):
+                self._drag_item  = item
+                self._drag_start = QCursor.pos()
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._drag_start or self._dragging:
+            if self._drag_start and self._drag_item and not self._dragging:
+                if (QCursor.pos() - self._drag_start).manhattanLength() > self.DRAG_THRESHOLD:
+                    self._begin()
+            return  # never pass to super while drag is pending or active
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if not self._dragging:
+            self._drag_item  = None
+            self._drag_start = None
+        super().mouseReleaseEvent(event)
+
+    def keyPressEvent(self, event):
+        if self._dragging and event.key() == Qt.Key_Escape:
+            self.browser.show_status_message("Drag cancelled.", "gray")
+            self._end()
+        super().keyPressEvent(event)
+
+    # --- Drag lifecycle ---
+
+    def _begin(self):
+        self._dragging   = True
+        self._cursor_set = True
+        mat_name = self._drag_item.data(Qt.UserRole).split("::")[-1]
+        self._overlay = DragOverlay(mat_name)
+        lx, ly = _logical_cursor_pos()
+        self._overlay.move(lx + 14, ly + 14)
+        self._overlay.show()
+        QApplication.setOverrideCursor(Qt.DragCopyCursor)
+        self._poll.start(self.POLL_MS)
+
+    def _tick(self):
+        """
+        Runs every POLL_MS ms.
+        Reads Win32 async key state — works even when cursor is outside Qt.
+        """
+        button_held = ctypes.windll.user32.GetAsyncKeyState(self.VK_LBUTTON) & 0x8000
+        if not button_held:
+            px, py = _phys_cursor_pos()
+            self._drop(px, py)
+            self._end()
+            return
+
+        # Move overlay (Qt logical coords — let Qt handle DPI)
+        lx, ly = _logical_cursor_pos()
+        if self._overlay:
+            self._overlay.move(lx + 14, ly + 14)
+
+        # Update cursor shape (physical coords for accurate Win32 hit-test)
+        px, py = _phys_cursor_pos()
+        over_max = _is_max_viewport(_hwnd_at(px, py))
+        QApplication.changeOverrideCursor(
+            Qt.DragCopyCursor if over_max else Qt.ForbiddenCursor
+        )
+
+    def _drop(self, phys_x, phys_y):
+        hwnd = _hwnd_at(phys_x, phys_y)
+        if not hwnd or not _is_max_viewport(hwnd):
+            self.browser.show_status_message(
+                "Drop cancelled — cursor not over a 3ds Max viewport.", "orange"
+            )
+            return
+
+        data     = self._drag_item.data(Qt.UserRole)
+        mat_path, mat_name = data.split("::")
+        mat_path = mat_path.replace("\\", "/")
+
+        # Physical viewport-local coords → what mapScreenToWorldRay expects
+        vp_x, vp_y = _screen_to_local(hwnd, phys_x, phys_y)
+        self._assign(mat_path, mat_name, int(vp_x), int(vp_y))
+
+    def _assign(self, mat_path, mat_name, vp_x, vp_y):
+        try:
+            from pymxs import runtime as rt
+            ms = f'''(
+                -- Load material
+                local lib = loadTempMaterialLibrary @"{mat_path}"
+                local theMat = undefined
+                for i = 1 to lib.count do (
+                    if lib[i].name == "{mat_name}" then ( theMat = lib[i]; exit )
+                )
+                if theMat == undefined then (
+                    "MAT_NOT_FOUND"
+                ) else (
+                    local ray = mapScreenToWorldRay [{vp_x}, {vp_y}]
+                    if ray == undefined then (
+                        "NO_RAY"
+                    ) else (
+                        -- Per-object ray test: avoids intersectRayScene format issues
+                        local closest = undefined
+                        local closestDist = 1e30
+                        for obj in geometry do (
+                            try (
+                                local h = intersectRay obj ray
+                                if h != undefined then (
+                                    local d = distance ray.pos h.pos
+                                    if d < closestDist then (
+                                        closestDist = d
+                                        closest = obj
+                                    )
+                                )
+                            ) catch ()
+                        )
+                        if closest != undefined then (
+                            closest.material = theMat
+                            closest.name
+                        ) else (
+                            "NO_HIT"
+                        )
+                    )
+                )
+            )'''
+            result = rt.execute(ms)
+            msgs = {
+                "MAT_NOT_FOUND": (f"Material '{mat_name}' not found in file.", "red"),
+                "NO_RAY":        ("Could not build a ray — make sure a viewport is active.", "red"),
+                "NO_HIT":        ("No mesh under cursor — drop directly onto a visible object.", "orange"),
+            }
+            if result in msgs:
+                self.browser.show_status_message(*msgs[result])
+            else:
+                self.browser.show_status_message(f"Assigned '{mat_name}' to '{result}'", "green")
+        except Exception as e:
+            self.browser.show_status_message(f"Drop failed: {e}", "red")
+            print(f"[ERROR] drag-drop assign: {e}")
+
+    def _end(self):
+        self._poll.stop()
+        if self._overlay:
+            self._overlay.close()
+            self._overlay = None
+        if self._cursor_set:
+            QApplication.restoreOverrideCursor()
+            self._cursor_set = False
+        self._dragging   = False
+        self._drag_item  = None
+        self._drag_start = None
+
+
 # ==========================
 # Main Asset Browser
 # ==========================
@@ -33,6 +287,7 @@ class AssetBrowserWidget(QWidget):
         self.is_rendering = False
         self._move_in_progress = False
         self.material_class_cache = {}
+        self.context_menu = None
         
         self.config = load_config()
         self.active_render_engine = self.detect_active_render_engine()        
@@ -217,11 +472,10 @@ class AssetBrowserWidget(QWidget):
         self.search_bar.setPlaceholderText("Search materials...")
         self.search_bar.textChanged.connect(self.filter_items)
         tools_layout.addLayout(top_tools_layout)
-        tools_layout.addWidget(self.search_bar)
         self.main_layout.addWidget(self.group_tools)
 
         # --- Main asset list ---
-        self.asset_list = QListWidget()
+        self.asset_list = DraggableMaterialList(self)
         self.asset_list.setViewMode(QListWidget.IconMode)
         self.asset_list.setGridSize(QSize(180, 260))
         self.asset_list.setIconSize(QSize(150, 140))
@@ -240,11 +494,6 @@ class AssetBrowserWidget(QWidget):
         
         self.asset_list.setDragEnabled(False)
         self.asset_list.setAcceptDrops(False)
-        #self.asset_list.setDragDropMode(QListWidget.NoDragDrop)    
-         
-        
-        
-        
         self.asset_list.setStyleSheet(""" ... """)
 
         def format_item_label(text):
@@ -761,6 +1010,7 @@ class AssetBrowserWidget(QWidget):
 # ==========================
     def generate_thumbnail(self, mat_path, mat_name, callback=None):
         print(f"[GENERATE] Starting thumbnail for: {mat_name}")
+        original_renderer = None
         try:
             import inspect, re, os
             from pymxs import runtime as rt
@@ -838,7 +1088,7 @@ class AssetBrowserWidget(QWidget):
                 self.log_status("[ERROR] This must run inside 3ds Max.", "error")
                 return
 
-            original_renderer = rt.renderers.current # Store the current renderer to restore later
+            original_renderer = rt.renderers.current
 
             # === Render with specific scene for truly native supported engine materials ===
             scene_file = None
@@ -985,11 +1235,12 @@ class AssetBrowserWidget(QWidget):
             self.log_status(f"[ERROR] Thumbnail generation failed: {e}", "error")
         finally:
             # Always restore the original renderer
-            try:
-                rt.renderers.current = original_renderer
-                self.log_status(f"[DEBUG] Restored renderer to: {str(original_renderer)}")
-            except Exception as e:
-                self.log_status(f"[WARNING] Could not restore original renderer: {e}", "warning")
+            if original_renderer is not None:
+                try:
+                    rt.renderers.current = original_renderer
+                    self.log_status(f"[DEBUG] Restored renderer to: {str(original_renderer)}")
+                except Exception as e:
+                    self.log_status(f"[WARNING] Could not restore original renderer: {e}", "warning")
 
             if getattr(self, 'thumbnail_dialog', None):
                 try:
@@ -1362,52 +1613,6 @@ class AssetBrowserWidget(QWidget):
     
      
 
-    def write_maxscript(self, scene_file, mat_path, mat_name, thumb_path, script_path):
-        try:
-            # ?? LOG SECEN
-            self.log_status(f"[DEBUG] Raw scene_file: {scene_file}", level="DEBUG")
-
-            # ?? CHECK MAX FILE
-            if not scene_file.lower().endswith(".max"):
-                raise ValueError(f"? scene_file is invalid: {scene_file}")
-
-            with open(script_path, "w", encoding="utf-8") as f:
-                # ? LODE MAX FILE
-                f.write(f'loadMaxFile @"{scene_file}" quiet:true\n')
-                f.write('sleep 0.2\n')
-
-                # ?? FIND Material
-                f.write(f'matlib = loadTempMaterialLibrary @"{mat_path}"\n')
-                f.write(f'format "Searching for: {mat_name}\\n"\n')
-                f.write('theMat = undefined\n')
-                f.write('for i = 1 to matlib.count do (\n')
-                f.write(f'    if matlib[i].name == "{mat_name}" then (\n')
-                f.write('        theMat = matlib[i]\n')
-                f.write('        exit\n')
-                f.write('    )\n')
-                f.write(')\n')
-
-                # ? FIND Materil LOG
-                f.write('format "Loaded material: %\\n" (if theMat != undefined then theMat.name else "NOT FOUND")\n')
-
-                # ?? ADD MATERIAL AND RENDER
-                f.write('if (isValidNode $Sphere001 and isValidNode $Cylinder001 and theMat != undefined) then (\n')
-                f.write('    $Sphere001.material = theMat\n')
-                f.write('    $Cylinder001.material = theMat\n')
-                f.write(f'    render width:128 height:128 vfb:false outputfile:@"{thumb_path}"\n')
-                f.write(') else (\n')
-                f.write('    format "ERROR: Material or scene objects not found.\\n"\n')
-                f.write(')\n')
-
-                # ? EXIT 3DMAX
-                f.write('quitMax #noPrompt\n')
-
-            self.log_status(f"? MXS written to: {script_path}", level="DEBUG")
-            return True
-
-        except Exception as e:
-            self.log_status(f"? Failed to write .ms file: {e}", level="ERROR")
-            return False
 
 # ==========================
 # Show Material From .mat
@@ -1722,7 +1927,6 @@ class AssetBrowserWidget(QWidget):
         import re
         from PySide6.QtWidgets import QMessageBox
         
-        self.asset_list.selectedItems()
         item = self.asset_list.itemAt(position)
         print("[DEBUG] itemAt:", item)
         if item:
@@ -1754,7 +1958,7 @@ class AssetBrowserWidget(QWidget):
 
         menu = QMenu()
         is_folder = os.path.isdir(path)
-        is_mat = "::" in path and path.lower().endswith(".mat::" + path.split("::")[-1].lower())
+        is_mat = "::" in path and path.split("::")[0].lower().endswith(".mat")
         is_orbx = "::" in path and path.lower().endswith(".orbx::orbx")
         is_mtlx_file = isinstance(path, str) and path.lower().endswith(".mtlx")
         
